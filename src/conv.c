@@ -16,6 +16,21 @@
    4, 16, 24, 16, 4, \
    1,  4,  6,  4, 1}
 
+#define RIDGE_LAYER \
+  {-1, -1, -1, \
+   -1,  8, -1, \
+   -1, -1, -1}
+
+#define GAUSSIAN_3x3_BLUE_LAYER \
+  {1, 2, 1, \
+   2, 4, 2, \
+   1, 2, 1}
+
+#define IDENTITY_LAYER \
+  {0, 0, 0, \
+   0, 1, 0, \
+   0, 0, 0}
+
 // clang-format on
 
 static bool in_bounds_of_image(size_t x, int32_t y, int32_t height,
@@ -77,7 +92,7 @@ void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
 }
 
 KernelMatrix ker_identity() {
-  static const int32_t identity_mtx[3 * 3] = {0, 0, 0, 0, 1, 0, 0, 0, 0};
+  static const int32_t identity_mtx[3 * 3] = IDENTITY_LAYER;
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
       .denominator_coef = 1,
@@ -93,7 +108,7 @@ KernelMatrix ker_identity() {
 }
 
 KernelMatrix ker_3x3_gauss_blur() {
-  static const int32_t gauss_mtx[3 * 3] = {1, 2, 1, 2, 4, 2, 1, 2, 1};
+  static const int32_t gauss_mtx[3 * 3] = GAUSSIAN_3x3_BLUE_LAYER;
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
       .denominator_coef = 16,
@@ -109,7 +124,7 @@ KernelMatrix ker_3x3_gauss_blur() {
 }
 
 KernelMatrix ker_ridge() {
-  static const int32_t ridge[3 * 3] = {-1, -1, -1, -1, 8, -1, -1, -1, -1};
+  static const int32_t ridge[3 * 3] = RIDGE_LAYER;
 
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
