@@ -1,5 +1,6 @@
 #include "conv.h"
 #include "cbmp.h"
+#include <limits.h>
 #include <omp.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,6 +11,8 @@
 #define CHANNELS_COUNT 3
 
 /* clang-format off */
+#define GAUSSIAN_5x5_BLUR_COEF 256
+#define GAUSSIAN_5x5_BLUR_SIZE 5
 #define GAUSSIAN_5x5_BLUR_LAYER \
   {1,  4,  6,  4, 1, \
    4, 16, 24, 16, 4, \
@@ -17,16 +20,22 @@
    4, 16, 24, 16, 4, \
    1,  4,  6,  4, 1}
 
+#define RIDGE_COEF 1
+#define RIDGE_SIZE 3
 #define RIDGE_LAYER \
   {-1, -1, -1, \
    -1,  8, -1, \
    -1, -1, -1}
 
-#define GAUSSIAN_3x3_BLUE_LAYER \
+#define GAUSSIAN_3x3_BLUR_COEF 16
+#define GAUSSIAN_3x3_BLUR_SIZE 3
+#define GAUSSIAN_3x3_BLUR_LAYER \
   {1, 2, 1, \
    2, 4, 2, \
    1, 2, 1}
 
+#define IDENTITY_COEF 1
+#define IDENTITY_SIZE 3
 #define IDENTITY_LAYER \
   {0, 0, 0, \
    0, 1, 0, \
@@ -34,9 +43,9 @@
 
 // clang-format on
 
-static bool in_bounds_of_image(int32_t x, int32_t y, int32_t height,
+static bool in_bounds_of_image(int32_t x_cord, int32_t y_cord, int32_t height,
                                int32_t width) {
-  return (x >= 0 && x < width && y >= 0 && y < height);
+  return (x_cord >= 0 && x_cord < width && y_cord >= 0 && y_cord < height);
 }
 
 static int64_t multiply_by_rational_and_ceil(long num, long numer, long denom) {
@@ -47,8 +56,18 @@ static int64_t multiply_by_rational_and_ceil(long num, long numer, long denom) {
   return quotient + (remainder > 0 ? 1 : 0);
 }
 
-static void convolute_pixel_sequentialy(BMP *image, int32_t x, int32_t y,
-                                        KernelMatrix kernel) {
+static uint8_t to_byte(int64_t value) {
+  if (value < 0) {
+    return 0;
+  }
+  if (value > UCHAR_MAX) {
+    return UCHAR_MAX;
+  }
+  return value;
+}
+
+static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
+                                        int32_t y_cord, KernelMatrix kernel) {
   int64_t red = 0;
   int64_t green = 0;
   int64_t blue = 0;
@@ -56,19 +75,25 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x, int32_t y,
   const size_t width = get_width(image);
   const size_t ker_size = kernel.size;
 
-  for (size_t offset_x = 0; offset_x < ker_size; ++offset_x) {
-    for (size_t offset_y = 0; offset_y < ker_size; ++offset_y) {
-      const int32_t temp_x = x + offset_x - (ker_size / 2);
-      const int32_t temp_y = y + offset_y - (ker_size / 2);
-      if (!in_bounds_of_image(temp_x, temp_y, height, width)) {
+  for (size_t offset_x_cord = 0; offset_x_cord < ker_size; ++offset_x_cord) {
+    for (size_t offset_y_cord = 0; offset_y_cord < ker_size; ++offset_y_cord) {
+      const int32_t temp_x_cord = x_cord + offset_x_cord - (ker_size / 2);
+      const int32_t temp_y_cord = y_cord + offset_y_cord - (ker_size / 2);
+      if (!in_bounds_of_image(temp_x_cord, temp_y_cord, height, width)) {
         continue;
       }
-      uint8_t temp_red, temp_green, temp_blue;
-      get_pixel_rgb(image, temp_x, temp_y, &temp_red, &temp_green, &temp_blue);
+      uint8_t temp_red;
+      uint8_t temp_green;
+      uint8_t temp_blue;
+      get_pixel_rgb(image, temp_x_cord, temp_y_cord, &temp_red, &temp_green,
+                    &temp_blue);
 
-      red += kernel.mtx[0][offset_y * ker_size + offset_x] * temp_red;
-      green += kernel.mtx[1][offset_y * ker_size + offset_x] * temp_green;
-      blue += kernel.mtx[2][offset_y * ker_size + offset_x] * temp_blue;
+      red +=
+          kernel.mtx[0][(offset_y_cord * ker_size) + offset_x_cord] * temp_red;
+      green += kernel.mtx[1][(offset_y_cord * ker_size) + offset_x_cord] *
+               temp_green;
+      blue +=
+          kernel.mtx[2][(offset_y_cord * ker_size) + offset_x_cord] * temp_blue;
     }
   }
 
@@ -76,19 +101,17 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x, int32_t y,
   green = multiply_by_rational_and_ceil(green, 1, kernel.denominator_coef);
   blue = multiply_by_rational_and_ceil(blue, 1, kernel.denominator_coef);
 
-  red = (red < 0) ? 0 : (red > 255) ? 255 : red;
-  green = (green < 0) ? 0 : (green > 255) ? 255 : green;
-  blue = (blue < 0) ? 0 : (blue > 255) ? 255 : blue;
-  set_pixel_rgb(image, x, y, red, green, blue);
+  set_pixel_rgb(image, x_cord, y_cord, to_byte(red), to_byte(green),
+                to_byte(blue));
 }
 
 void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
-  for (size_t y = 0; y < height; ++y) {
-    for (size_t x = 0; x < width; ++x) {
-      convolute_pixel_sequentialy(image, x, y, kernel);
+  for (size_t j = 0; j < height; ++j) {
+    for (size_t i = 0; i < width; ++i) {
+      convolute_pixel_sequentialy(image, i, j, kernel);
     }
   }
 }
@@ -97,10 +120,10 @@ void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
-  for (size_t y = 0; y < height; ++y) {
+  for (size_t j = 0; j < height; ++j) {
 #pragma omp parallel for
-    for (size_t x = 0; x < width; ++x) {
-      convolute_pixel_sequentialy(image, x, y, kernel);
+    for (size_t i = 0; i < width; ++i) {
+      convolute_pixel_sequentialy(image, i, j, kernel);
     }
   }
 }
@@ -109,8 +132,8 @@ KernelMatrix ker_identity() {
   static const int32_t identity_mtx[3 * 3] = IDENTITY_LAYER;
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
-      .denominator_coef = 1,
-      .size = 3,
+      .denominator_coef = IDENTITY_COEF,
+      .size = IDENTITY_SIZE,
   };
 
   for (int i = 0; i < 3; ++i) {
@@ -122,11 +145,11 @@ KernelMatrix ker_identity() {
 }
 
 KernelMatrix ker_3x3_gauss_blur() {
-  static const int32_t gauss_mtx[3 * 3] = GAUSSIAN_3x3_BLUE_LAYER;
+  static const int32_t gauss_mtx[3 * 3] = GAUSSIAN_3x3_BLUR_LAYER;
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
-      .denominator_coef = 16,
-      .size = 3,
+      .denominator_coef = GAUSSIAN_3x3_BLUR_COEF,
+      .size = GAUSSIAN_3x3_BLUR_SIZE,
   };
 
   for (int i = 0; i < 3; ++i) {
@@ -142,8 +165,8 @@ KernelMatrix ker_ridge() {
 
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
-      .denominator_coef = 1,
-      .size = 3,
+      .denominator_coef = RIDGE_COEF,
+      .size = RIDGE_SIZE,
   };
 
   for (int i = 0; i < 3; ++i) {
@@ -159,8 +182,8 @@ KernelMatrix ker_5x5_gauss_blur() {
 
   KernelMatrix ker = {
       .mtx = {NULL, NULL, NULL},
-      .denominator_coef = 256,
-      .size = 5,
+      .denominator_coef = GAUSSIAN_5x5_BLUR_COEF,
+      .size = GAUSSIAN_5x5_BLUR_SIZE,
   };
 
   for (int i = 0; i < 3; ++i) {
@@ -172,7 +195,7 @@ KernelMatrix ker_5x5_gauss_blur() {
 }
 
 void free_kernel_matrix(KernelMatrix ker) {
-  for (int i = 0; i < 3; ++i) {
+  for (size_t i = 0; i < ker.size; ++i) {
     if (ker.mtx[i]) {
       free(ker.mtx[i]);
     }
