@@ -1,7 +1,7 @@
 .PHONY: all test debug bear clean
 
 CC:=gcc
-CFLAGS:= -Werror -Wall -O3
+CFLAGS:= -Werror -Wall -O3 -fopenmp
 TEST_LDFLAGS:= -lcunit
 
 SRC:=$(wildcard src/*.c)

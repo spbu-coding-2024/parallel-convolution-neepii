@@ -1,5 +1,6 @@
 #include "conv.h"
 #include "cbmp.h"
+#include <omp.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -54,6 +55,7 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x, int32_t y,
   const int32_t height = get_height(image);
   const int32_t width = get_width(image);
   const int32_t ker_size = kernel.size;
+
   for (int32_t offset_x = 0; offset_x < ker_size; ++offset_x) {
     for (int32_t offset_y = 0; offset_y < ker_size; ++offset_y) {
       const int32_t temp_x = x + offset_x - (ker_size / 2);
@@ -85,6 +87,18 @@ void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
   const int32_t width = get_width(image);
 
   for (size_t y = 0; y < height; ++y) {
+    for (size_t x = 0; x < width; ++x) {
+      convolute_pixel_sequentialy(image, x, y, kernel);
+    }
+  }
+}
+
+void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
+  const int32_t height = get_height(image);
+  const int32_t width = get_width(image);
+
+  for (size_t y = 0; y < height; ++y) {
+#pragma omp parallel for
     for (size_t x = 0; x < width; ++x) {
       convolute_pixel_sequentialy(image, x, y, kernel);
     }

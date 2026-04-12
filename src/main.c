@@ -1,6 +1,7 @@
 #include "cbmp.h"
 #include "conv.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,15 +14,17 @@ void usage(void) {
   printf("usage:\n"
          "\t-h    Display this message\n"
          "\t-i    Pass input file\n"
-         "\t-o    Pass output file\n");
+         "\t-o    Pass output file\n"
+         "\t-s    Run program sequentially\n");
 }
 
 int main(int argc, char *argv[]) {
   int opt;
+  bool parallelize = true;
   char *input_path = NULL;
   char *output_path = NULL;
 
-  while ((opt = getopt(argc, argv, "hi:o:")) != -1) {
+  while ((opt = getopt(argc, argv, "hi:o:s")) != -1) {
     switch (opt) {
     case 'h':
       usage();
@@ -39,6 +42,9 @@ int main(int argc, char *argv[]) {
         perror("strdup failed");
         return EXIT_FAILURE;
       }
+      break;
+    case 's':
+      parallelize = false;
       break;
     }
   }
@@ -58,7 +64,12 @@ int main(int argc, char *argv[]) {
   /* KernelMatrix kernel_mtx = ker_3x3_gauss_blur(); */
   KernelMatrix kernel_mtx = ker_5x5_gauss_blur();
   /* KernelMatrix kernel_mtx = ker_identity(); */
-  conv_apply_kernel_sequentialy(image, kernel_mtx);
+  if (parallelize) {
+
+  } else {
+    conv_apply_kernel_sequentialy(image, kernel_mtx);
+  }
+
   bwrite(image, output_path);
   bclose(image);
   free_kernel_matrix(kernel_mtx);
