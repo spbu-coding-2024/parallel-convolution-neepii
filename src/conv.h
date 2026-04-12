@@ -10,6 +10,7 @@ typedef struct {
 } KernelMatrix;
 
 void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel);
+void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel);
 
 KernelMatrix ker_identity();
 KernelMatrix ker_3x3_gauss_blur();

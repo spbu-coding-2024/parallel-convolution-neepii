@@ -64,8 +64,9 @@ int main(int argc, char *argv[]) {
   /* KernelMatrix kernel_mtx = ker_3x3_gauss_blur(); */
   KernelMatrix kernel_mtx = ker_5x5_gauss_blur();
   /* KernelMatrix kernel_mtx = ker_identity(); */
-  if (parallelize) {
 
+  if (parallelize) {
+    conv_apply_kernel_parallelly(image, kernel_mtx);
   } else {
     conv_apply_kernel_sequentialy(image, kernel_mtx);
   }

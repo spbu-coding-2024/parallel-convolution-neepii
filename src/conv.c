@@ -34,7 +34,7 @@
 
 // clang-format on
 
-static bool in_bounds_of_image(size_t x, int32_t y, int32_t height,
+static bool in_bounds_of_image(int32_t x, int32_t y, int32_t height,
                                int32_t width) {
   return (x >= 0 && x < width && y >= 0 && y < height);
 }
@@ -52,12 +52,12 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x, int32_t y,
   int64_t red = 0;
   int64_t green = 0;
   int64_t blue = 0;
-  const int32_t height = get_height(image);
-  const int32_t width = get_width(image);
-  const int32_t ker_size = kernel.size;
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+  const size_t ker_size = kernel.size;
 
-  for (int32_t offset_x = 0; offset_x < ker_size; ++offset_x) {
-    for (int32_t offset_y = 0; offset_y < ker_size; ++offset_y) {
+  for (size_t offset_x = 0; offset_x < ker_size; ++offset_x) {
+    for (size_t offset_y = 0; offset_y < ker_size; ++offset_y) {
       const int32_t temp_x = x + offset_x - (ker_size / 2);
       const int32_t temp_y = y + offset_y - (ker_size / 2);
       if (!in_bounds_of_image(temp_x, temp_y, height, width)) {
@@ -83,8 +83,8 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x, int32_t y,
 }
 
 void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
-  const int32_t height = get_height(image);
-  const int32_t width = get_width(image);
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
 
   for (size_t y = 0; y < height; ++y) {
     for (size_t x = 0; x < width; ++x) {
@@ -94,8 +94,8 @@ void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
 }
 
 void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
-  const int32_t height = get_height(image);
-  const int32_t width = get_width(image);
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
 
   for (size_t y = 0; y < height; ++y) {
 #pragma omp parallel for
