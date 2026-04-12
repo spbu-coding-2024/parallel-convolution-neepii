@@ -54,12 +54,14 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
   free(input_path);
-
-  /* conv_apply_kernel_sequentialy(image, ker_gauss_blur()); */
-  /* conv_apply_kernel_sequentialy(image, ker_identity()); */
-  conv_apply_kernel_sequentialy(image, ker_ridge());
+  /* KernelMatrix kernel_mtx = ker_ridge(); */
+  /* KernelMatrix kernel_mtx = ker_3x3_gauss_blur(); */
+  KernelMatrix kernel_mtx = ker_5x5_gauss_blur();
+  /* KernelMatrix kernel_mtx = ker_identity(); */
+  conv_apply_kernel_sequentialy(image, kernel_mtx);
   bwrite(image, output_path);
   bclose(image);
+  free_kernel_matrix(kernel_mtx);
 
   return EXIT_SUCCESS;
 }
