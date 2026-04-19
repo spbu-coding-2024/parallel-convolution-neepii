@@ -64,12 +64,13 @@ struct pixel_s {
   uint8_t a;
 };
 
-static bool in_bounds_of_image(int32_t x_cord, int32_t y_cord, int32_t height,
-                               int32_t width) {
+static inline bool in_bounds_of_image(int32_t x_cord, int32_t y_cord,
+                                      int32_t height, int32_t width) {
   return (x_cord >= 0 && x_cord < width && y_cord >= 0 && y_cord < height);
 }
 
-static int64_t multiply_by_rational_and_ceil(long num, long numer, long denom) {
+static inline int64_t multiply_by_rational_and_ceil(long num, long numer,
+                                                    long denom) {
   long product = num * numer;
   long remainder = product % denom;
   long quotient = product / denom;
@@ -77,7 +78,7 @@ static int64_t multiply_by_rational_and_ceil(long num, long numer, long denom) {
   return quotient + (remainder > 0 ? 1 : 0);
 }
 
-static uint8_t to_byte(int64_t value) {
+static inline uint8_t to_byte(int64_t value) {
   if (value < 0) {
     return 0;
   }
@@ -85,6 +86,21 @@ static uint8_t to_byte(int64_t value) {
     return UCHAR_MAX;
   }
   return value;
+}
+
+static inline int32_t apply_mirror_padding(int32_t cord, size_t max_value) {
+  if (max_value == 1) {
+    return 0;
+  }
+  const size_t period = 2 * (max_value - 1);
+  size_t mod = cord % period;
+  if (mod <= 0) {
+    mod += period;
+  }
+  if (mod <= max_value - 1) {
+    return mod;
+  }
+  return period - mod;
 }
 
 static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
@@ -99,8 +115,11 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
 
   for (size_t offset_x_cord = 0; offset_x_cord < ker_size; ++offset_x_cord) {
     for (size_t offset_y_cord = 0; offset_y_cord < ker_size; ++offset_y_cord) {
-      const int32_t temp_x_cord = x_cord + offset_x_cord - (ker_size / 2);
-      const int32_t temp_y_cord = y_cord + offset_y_cord - (ker_size / 2);
+      const int32_t temp_x_cord =
+          apply_mirror_padding(x_cord + offset_x_cord - (ker_size / 2), width);
+      const int32_t temp_y_cord =
+          apply_mirror_padding(y_cord + offset_y_cord - (ker_size / 2), height);
+
       if (!in_bounds_of_image(temp_x_cord, temp_y_cord, height, width)) {
         continue;
       }
