@@ -7,6 +7,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef BENCHMARK
+#include <time.h>
+#endif
+
 #define EXIT_SUCCESS 0
 #define EXIT_FAILURE 1
 
@@ -78,11 +82,24 @@ int main(int argc, char *argv[]) {
 
   KernelMatrix kernel_mtx = choose_kernel_matrix(filter_name);
 
+#ifdef BENCHMARK
+  struct timespec start;
+  struct timespec end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
+
   if (parallelize) {
     conv_apply_kernel_parallelly(image, kernel_mtx);
   } else {
     conv_apply_kernel_sequentialy(image, kernel_mtx);
   }
+
+#ifdef BENCHMARK
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  double time_taken =
+      (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
+  printf("%f\n", time_taken);
+#endif
 
   bwrite(image, output_path);
   bclose(image);

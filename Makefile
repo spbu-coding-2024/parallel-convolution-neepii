@@ -20,6 +20,9 @@ test: build_test
 debug: CFLAGS = -g -Og
 debug: build/$(EXEC_NAME)
 
+benchmark: CFLAGS += -DBENCHMARK
+benchmark: build/$(EXEC_NAME)
+
 build/$(EXEC_NAME): $(OBJ)
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(OBJ) -o build/$(EXEC_NAME)
