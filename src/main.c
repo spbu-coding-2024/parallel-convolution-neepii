@@ -11,11 +11,19 @@
 #define EXIT_FAILURE 1
 
 void usage(void) {
-  printf("usage:\n"
+  printf("USAGE:\n"
          "\t-h    Display this message\n"
-         "\t-i    Pass input file\n"
-         "\t-o    Pass output file\n"
-         "\t-s    Run program sequentially\n");
+         "\t-i    Pass an input file (e.g. -i input.bmp)\n"
+         "\t-o    Pass an output file\n"
+         "\t-s    Run program sequentially\n"
+         "\t-f    Choose a filter (e.g. -f blur3, see FILTER section)\n"
+         "\nFILTERS:\n"
+         "\tident - identity filter, do nothing\n"
+         "\tblur3 - make image slightly blurry\n"
+         "\tblur5 - make image more blurry\n"
+         "\tridge - highlight ridges of image\n"
+
+  );
 }
 
 int main(int argc, char *argv[]) {
@@ -23,8 +31,9 @@ int main(int argc, char *argv[]) {
   bool parallelize = true;
   char *input_path = NULL;
   char *output_path = NULL;
+  char *filter_name = NULL;
 
-  while ((opt = getopt(argc, argv, "hi:o:s")) != -1) {
+  while ((opt = getopt(argc, argv, "f:hi:o:s")) != -1) {
     switch (opt) {
     case 'h':
       usage();
@@ -46,6 +55,13 @@ int main(int argc, char *argv[]) {
     case 's':
       parallelize = false;
       break;
+    case 'f':
+      filter_name = strdup(optarg);
+      if (!filter_name) {
+        perror("strdup failed");
+        return EXIT_FAILURE;
+      }
+      break;
     }
   }
 
@@ -59,11 +75,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Bad input file\n");
     return EXIT_FAILURE;
   }
-  free(input_path);
-  /* KernelMatrix kernel_mtx = ker_ridge(); */
-  /* KernelMatrix kernel_mtx = ker_3x3_gauss_blur(); */
-  KernelMatrix kernel_mtx = ker_5x5_gauss_blur();
-  /* KernelMatrix kernel_mtx = ker_identity(); */
+
+  KernelMatrix kernel_mtx = choose_kernel_matrix(filter_name);
 
   if (parallelize) {
     conv_apply_kernel_parallelly(image, kernel_mtx);
@@ -73,6 +86,8 @@ int main(int argc, char *argv[]) {
 
   bwrite(image, output_path);
   bclose(image);
+  free(output_path);
+  free(input_path);
   free_kernel_matrix(kernel_mtx);
 
   return EXIT_SUCCESS;
