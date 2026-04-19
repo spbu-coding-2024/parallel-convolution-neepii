@@ -57,6 +57,13 @@ struct ker_info_s {
   KernelMatrix (*init_func)(void);
 };
 
+struct pixel_s {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t a;
+};
+
 static bool in_bounds_of_image(int32_t x_cord, int32_t y_cord, int32_t height,
                                int32_t width) {
   return (x_cord >= 0 && x_cord < width && y_cord >= 0 && y_cord < height);
@@ -81,7 +88,8 @@ static uint8_t to_byte(int64_t value) {
 }
 
 static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
-                                        int32_t y_cord, KernelMatrix kernel) {
+                                        int32_t y_cord, KernelMatrix kernel,
+                                        struct pixel_s *pixel_arr) {
   int64_t red = 0;
   int64_t green = 0;
   int64_t blue = 0;
@@ -115,31 +123,55 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
   green = multiply_by_rational_and_ceil(green, 1, kernel.denominator_coef);
   blue = multiply_by_rational_and_ceil(blue, 1, kernel.denominator_coef);
 
-  set_pixel_rgb(image, x_cord, y_cord, to_byte(red), to_byte(green),
-                to_byte(blue));
+  pixel_arr[y_cord * width + x_cord].r = to_byte(red);
+  pixel_arr[y_cord * width + x_cord].g = to_byte(green);
+  pixel_arr[y_cord * width + x_cord].b = to_byte(blue);
 }
 
 void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
   for (size_t j = 0; j < height; ++j) {
     for (size_t i = 0; i < width; ++i) {
-      convolute_pixel_sequentialy(image, i, j, kernel);
+      convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
     }
   }
+
+  for (size_t y_cord = 0; y_cord < height; ++y_cord) {
+    for (size_t x_cord = 0; x_cord < width; ++x_cord) {
+      const struct pixel_s cell = new_pixels[y_cord * width + x_cord];
+      set_pixel_rgb(image, x_cord, y_cord, cell.r, cell.g, cell.b);
+    }
+  }
+
+  free(new_pixels);
 }
 
 void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
   for (size_t j = 0; j < height; ++j) {
 #pragma omp parallel for
     for (size_t i = 0; i < width; ++i) {
-      convolute_pixel_sequentialy(image, i, j, kernel);
+      convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
     }
   }
+
+  for (size_t y_cord = 0; y_cord < height; ++y_cord) {
+#pragma omp parallel for
+    for (size_t x_cord = 0; x_cord < width; ++x_cord) {
+      const struct pixel_s cell = new_pixels[y_cord * width + x_cord];
+      set_pixel_rgb(image, x_cord, y_cord, cell.r, cell.g, cell.b);
+    }
+  }
+
+  free(new_pixels);
 }
 
 // TODO: make a generic function for these init function

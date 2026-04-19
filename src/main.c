@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
   char *output_path = NULL;
   char *filter_name = NULL;
 
-  while ((opt = getopt(argc, argv, "f:hi:o:s")) != -1) {
+  while ((opt = getopt(argc, argv, "shi:o:f:")) != -1) {
     switch (opt) {
     case 'h':
       usage();
