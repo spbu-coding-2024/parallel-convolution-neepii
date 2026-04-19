@@ -142,9 +142,9 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
   green = multiply_by_rational_and_ceil(green, 1, kernel.denominator_coef);
   blue = multiply_by_rational_and_ceil(blue, 1, kernel.denominator_coef);
 
-  pixel_arr[y_cord * width + x_cord].r = to_byte(red);
-  pixel_arr[y_cord * width + x_cord].g = to_byte(green);
-  pixel_arr[y_cord * width + x_cord].b = to_byte(blue);
+  pixel_arr[(y_cord * width) + x_cord].r = to_byte(red);
+  pixel_arr[(y_cord * width) + x_cord].g = to_byte(green);
+  pixel_arr[(y_cord * width) + x_cord].b = to_byte(blue);
 }
 
 void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
@@ -161,7 +161,7 @@ void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
 
   for (size_t y_cord = 0; y_cord < height; ++y_cord) {
     for (size_t x_cord = 0; x_cord < width; ++x_cord) {
-      const struct pixel_s cell = new_pixels[y_cord * width + x_cord];
+      const struct pixel_s cell = new_pixels[(y_cord * width) + x_cord];
       set_pixel_rgb(image, x_cord, y_cord, cell.r, cell.g, cell.b);
     }
   }
@@ -185,7 +185,7 @@ void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
   for (size_t y_cord = 0; y_cord < height; ++y_cord) {
 #pragma omp parallel for
     for (size_t x_cord = 0; x_cord < width; ++x_cord) {
-      const struct pixel_s cell = new_pixels[y_cord * width + x_cord];
+      const struct pixel_s cell = new_pixels[(y_cord * width) + x_cord];
       set_pixel_rgb(image, x_cord, y_cord, cell.r, cell.g, cell.b);
     }
   }
