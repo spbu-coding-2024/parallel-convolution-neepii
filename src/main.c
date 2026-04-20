@@ -80,7 +80,10 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  KernelMatrix kernel_mtx = choose_kernel_matrix(filter_name);
+  KernelMatrix *kernel_mtx = choose_kernel_matrix(filter_name);
+  if (kernel_mtx == NULL) {
+    return EXIT_FAILURE;
+  }
 
 #ifdef BENCHMARK
   struct timespec start;

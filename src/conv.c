@@ -54,7 +54,7 @@
 
 struct ker_info_s {
   char *name;
-  KernelMatrix (*init_func)(void);
+  KernelMatrix *(*init_func)(void);
 };
 
 struct pixel_s {
@@ -104,14 +104,14 @@ static inline int32_t apply_mirror_padding(int32_t cord, size_t max_value) {
 }
 
 static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
-                                        int32_t y_cord, KernelMatrix kernel,
+                                        int32_t y_cord, KernelMatrix *kernel,
                                         struct pixel_s *pixel_arr) {
   int64_t red = 0;
   int64_t green = 0;
   int64_t blue = 0;
   const size_t height = get_height(image);
   const size_t width = get_width(image);
-  const size_t ker_size = kernel.size;
+  const size_t ker_size = kernel->size;
 
   for (size_t offset_x_cord = 0; offset_x_cord < ker_size; ++offset_x_cord) {
     for (size_t offset_y_cord = 0; offset_y_cord < ker_size; ++offset_y_cord) {
@@ -130,24 +130,24 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
                     &temp_blue);
 
       red +=
-          kernel.mtx[0][(offset_y_cord * ker_size) + offset_x_cord] * temp_red;
-      green += kernel.mtx[1][(offset_y_cord * ker_size) + offset_x_cord] *
+          kernel->mtx[0][(offset_y_cord * ker_size) + offset_x_cord] * temp_red;
+      green += kernel->mtx[1][(offset_y_cord * ker_size) + offset_x_cord] *
                temp_green;
-      blue +=
-          kernel.mtx[2][(offset_y_cord * ker_size) + offset_x_cord] * temp_blue;
+      blue += kernel->mtx[2][(offset_y_cord * ker_size) + offset_x_cord] *
+              temp_blue;
     }
   }
 
-  red = multiply_by_rational_and_ceil(red, 1, kernel.denominator_coef);
-  green = multiply_by_rational_and_ceil(green, 1, kernel.denominator_coef);
-  blue = multiply_by_rational_and_ceil(blue, 1, kernel.denominator_coef);
+  red = multiply_by_rational_and_ceil(red, 1, kernel->denominator_coef);
+  green = multiply_by_rational_and_ceil(green, 1, kernel->denominator_coef);
+  blue = multiply_by_rational_and_ceil(blue, 1, kernel->denominator_coef);
 
   pixel_arr[(y_cord * width) + x_cord].r = to_byte(red);
   pixel_arr[(y_cord * width) + x_cord].g = to_byte(green);
   pixel_arr[(y_cord * width) + x_cord].b = to_byte(blue);
 }
 
-void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
+void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix *kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
@@ -169,7 +169,7 @@ void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel) {
   free(new_pixels);
 }
 
-void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
+void conv_apply_kernel_parallelly(BMP *image, KernelMatrix *kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
@@ -195,89 +195,50 @@ void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel) {
 
 // TODO: make a generic function for these init function
 
-static KernelMatrix ker_identity() {
-  const int32_t identity_mtx[IDENTITY_SIZE * IDENTITY_SIZE] = IDENTITY_LAYER;
-  KernelMatrix ker = {
-      .mtx = {NULL, NULL, NULL},
-      .denominator_coef = IDENTITY_COEF,
-      .size = IDENTITY_SIZE,
-  };
+static inline KernelMatrix *ker_init(size_t ker_size, int32_t coef,
+                                     const int32_t *layer_mtx,
+                                     size_t layer_size) {
+  KernelMatrix *ker = malloc(sizeof(KernelMatrix));
+  ker->denominator_coef = coef;
+  ker->size = ker_size;
 
   for (int i = 0; i < LAYER_COUNT; ++i) {
-    ker.mtx[i] = malloc(sizeof(int32_t) * 3 * 3);
-    memcpy(ker.mtx[i], identity_mtx, sizeof(identity_mtx));
+    ker->mtx[i] = malloc(sizeof(int32_t) * ker_size * ker_size);
+    memcpy(ker->mtx[i], layer_mtx, layer_size);
   }
 
   return ker;
 }
 
-static KernelMatrix ker_3x3_gauss_blur() {
-  const int32_t gauss_mtx[GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE] =
+static KernelMatrix *ker_identity() {
+  const int32_t layer[IDENTITY_SIZE * IDENTITY_SIZE] = IDENTITY_LAYER;
+  return ker_init(IDENTITY_SIZE, IDENTITY_COEF, layer,
+                  IDENTITY_SIZE * IDENTITY_SIZE);
+}
+
+static KernelMatrix *ker_3x3_gauss_blur() {
+  const int32_t layer[GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE] =
       GAUSSIAN_3x3_BLUR_LAYER;
-  KernelMatrix ker = {
-      .mtx = {NULL, NULL, NULL},
-      .denominator_coef = GAUSSIAN_3x3_BLUR_COEF,
-      .size = GAUSSIAN_3x3_BLUR_SIZE,
-  };
-
-  for (int i = 0; i < LAYER_COUNT; ++i) {
-    ker.mtx[i] = malloc(sizeof(int32_t) * 3 * 3);
-    memcpy(ker.mtx[i], gauss_mtx, sizeof(gauss_mtx));
-  }
-
-  return ker;
+  return ker_init(GAUSSIAN_5x5_BLUR_SIZE, GAUSSIAN_5x5_BLUR_COEF, layer,
+                  GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE);
 }
 
-static KernelMatrix ker_ridge() {
-  const int32_t ridge[RIDGE_SIZE * RIDGE_SIZE] = RIDGE_LAYER;
-
-  KernelMatrix ker = {
-      .mtx = {NULL, NULL, NULL},
-      .denominator_coef = RIDGE_COEF,
-      .size = RIDGE_SIZE,
-  };
-
-  for (int i = 0; i < LAYER_COUNT; ++i) {
-    ker.mtx[i] = malloc(sizeof(int32_t) * 3 * 3);
-    memcpy(ker.mtx[i], ridge, sizeof(ridge));
-  }
-
-  return ker;
+static KernelMatrix *ker_ridge() {
+  const int32_t layer[RIDGE_SIZE * RIDGE_SIZE] = RIDGE_LAYER;
+  return ker_init(RIDGE_SIZE, RIDGE_COEF, layer, RIDGE_SIZE * RIDGE_SIZE);
 }
 
-static KernelMatrix ker_5x5_gauss_blur() {
-  const int32_t ridge[GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE] =
+static KernelMatrix *ker_5x5_gauss_blur() {
+  const int32_t layer[GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE] =
       GAUSSIAN_5x5_BLUR_LAYER;
-
-  KernelMatrix ker = {
-      .mtx = {NULL, NULL, NULL},
-      .denominator_coef = GAUSSIAN_5x5_BLUR_COEF,
-      .size = GAUSSIAN_5x5_BLUR_SIZE,
-  };
-
-  for (int i = 0; i < LAYER_COUNT; ++i) {
-    ker.mtx[i] = malloc(sizeof(int32_t) * ker.size * ker.size);
-    memcpy(ker.mtx[i], ridge, sizeof(ridge));
-  }
-
-  return ker;
+  return ker_init(GAUSSIAN_5x5_BLUR_SIZE, GAUSSIAN_5x5_BLUR_COEF, layer,
+                  GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE);
 }
 
-static KernelMatrix ker_sharpener() {
-  const int32_t sharp[SHARPENER_SIZE * SHARPENER_SIZE] = SHARPENER_LAYER;
-
-  KernelMatrix ker = {
-      .mtx = {NULL, NULL, NULL},
-      .denominator_coef = SHARPENER_COEF,
-      .size = SHARPENER_SIZE,
-  };
-
-  for (int i = 0; i < LAYER_COUNT; ++i) {
-    ker.mtx[i] = malloc(sizeof(int32_t) * ker.size * ker.size);
-    memcpy(ker.mtx[i], sharp, sizeof(sharp));
-  }
-
-  return ker;
+static KernelMatrix *ker_sharpener() {
+  const int32_t layer[SHARPENER_SIZE * SHARPENER_SIZE] = SHARPENER_LAYER;
+  return ker_init(SHARPENER_SIZE, SHARPENER_COEF, layer,
+                  SHARPENER_SIZE * SHARPENER_SIZE);
 }
 
 static const struct ker_info_s info_arr[] = {
@@ -288,7 +249,7 @@ static const struct ker_info_s info_arr[] = {
     {.name = "sharp", .init_func = ker_sharpener},
 };
 
-KernelMatrix choose_kernel_matrix(const char *name) {
+KernelMatrix *choose_kernel_matrix(const char *name) {
   if (!name) {
     return ker_identity();
   }
@@ -298,15 +259,13 @@ KernelMatrix choose_kernel_matrix(const char *name) {
       return info_arr[i].init_func();
     }
   }
-  KernelMatrix ker;
   fprintf(stderr, "No such filter\n");
-  return ker;
+  return NULL;
 }
 
-void free_kernel_matrix(KernelMatrix ker) {
+void free_kernel_matrix(KernelMatrix *ker) {
   for (size_t i = 0; i < LAYER_COUNT; ++i) {
-    if (ker.mtx[i]) {
-      free(ker.mtx[i]);
-    }
+    free(ker->mtx[i]);
   }
+  free(ker);
 }

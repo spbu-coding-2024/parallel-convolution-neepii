@@ -1,7 +1,8 @@
 .PHONY: all test debug bear clean
 
+# BITNESS:=$(#shell getconf LONG_BIT)
 CC:=gcc
-CFLAGS:= -Werror -Wall -Wextra -Wpedantic -Wshadow -O3 -fopenmp -march=native
+CFLAGS:= -Werror -Wall -Wextra -Wpedantic -Wshadow -O3 -fopenmp -march=native # -falign-loops=$(BITNESS)
 TEST_LDFLAGS:= -lcunit
 
 SRC:=$(wildcard src/*.c)

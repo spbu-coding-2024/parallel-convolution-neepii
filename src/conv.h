@@ -17,9 +17,9 @@ typedef struct {
   size_t size;
 } KernelMatrix;
 
-void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix kernel);
-void conv_apply_kernel_parallelly(BMP *image, KernelMatrix kernel);
+void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix *kernel);
+void conv_apply_kernel_parallelly(BMP *image, KernelMatrix *kernel);
 
-KernelMatrix choose_kernel_matrix(const char *name);
+KernelMatrix *choose_kernel_matrix(const char *name);
 
-void free_kernel_matrix(KernelMatrix ker);
+void free_kernel_matrix(KernelMatrix *ker);
