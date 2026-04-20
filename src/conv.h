@@ -1,4 +1,6 @@
-#pragma once
+#ifndef CONV_CONV_H
+#define CONV_CONV_H
+
 #include "cbmp.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -23,3 +25,5 @@ void conv_apply_kernel_parallelly(BMP *image, KernelMatrix *kernel);
 KernelMatrix *choose_kernel_matrix(const char *name);
 
 void free_kernel_matrix(KernelMatrix *ker);
+
+#endif

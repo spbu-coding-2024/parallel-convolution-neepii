@@ -1,6 +1,6 @@
 #include "conv.h"
-
 #include "cbmp.h"
+#include "matrix.h"
 #include <limits.h>
 #include <omp.h>
 #include <stdbool.h>
@@ -9,48 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define KERNEL_OFFSET_SIZE 9
 #define CHANNELS_COUNT 3
-
-/* clang-format off */
-#define GAUSSIAN_5x5_BLUR_COEF 256
-#define GAUSSIAN_5x5_BLUR_SIZE 5
-#define GAUSSIAN_5x5_BLUR_LAYER \
-  {1,  4,  6,  4, 1, \
-   4, 16, 24, 16, 4, \
-   6, 24, 36, 24, 6, \
-   4, 16, 24, 16, 4, \
-   1,  4,  6,  4, 1}
-
-#define RIDGE_COEF 1
-#define RIDGE_SIZE 3
-#define RIDGE_LAYER \
-  {-1, -1, -1, \
-   -1,  8, -1, \
-   -1, -1, -1}
-
-#define GAUSSIAN_3x3_BLUR_COEF 16
-#define GAUSSIAN_3x3_BLUR_SIZE 3
-#define GAUSSIAN_3x3_BLUR_LAYER \
-  {1, 2, 1, \
-   2, 4, 2, \
-   1, 2, 1}
-
-#define IDENTITY_COEF 1
-#define IDENTITY_SIZE 3
-#define IDENTITY_LAYER \
-  {0, 0, 0, \
-   0, 1, 0, \
-   0, 0, 0}
-
-#define SHARPENER_COEF 1
-#define SHARPENER_SIZE 3
-#define SHARPENER_LAYER \
-  { 0, -1, 0, \
-   -1,  5, -1,                                 \
-    0, -1, 0}
-
-// clang-format on
 
 struct ker_info_s {
   char *name;
