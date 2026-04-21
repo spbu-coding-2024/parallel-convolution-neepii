@@ -23,3 +23,6 @@ jobs:
 
       - name: Lint
         run: ./scripts/lint.sh
+
+      - name: Test
+        run: make test
