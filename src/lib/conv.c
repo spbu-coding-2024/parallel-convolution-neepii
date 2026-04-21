@@ -58,7 +58,8 @@ static inline int32_t apply_mirror_padding(int32_t cord, size_t max_value) {
 }
 
 static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
-                                        int32_t y_cord, KernelMatrix *kernel,
+                                        int32_t y_cord,
+                                        const KernelMatrix *kernel,
                                         struct pixel_s *pixel_arr) {
   int64_t red = 0;
   int64_t green = 0;
@@ -98,7 +99,7 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
   pixel_arr[(y_cord * width) + x_cord].b = to_byte(blue);
 }
 
-void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix *kernel) {
+void conv_apply_kernel_sequentialy(BMP *image, const KernelMatrix *kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
@@ -120,7 +121,7 @@ void conv_apply_kernel_sequentialy(BMP *image, KernelMatrix *kernel) {
   free(new_pixels);
 }
 
-void conv_apply_kernel_parallelly(BMP *image, KernelMatrix *kernel) {
+void conv_apply_kernel_parallelly(BMP *image, const KernelMatrix *kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
@@ -161,29 +162,29 @@ static inline KernelMatrix *ker_init(const size_t ker_size, const int32_t coef,
   return ker;
 }
 
-static KernelMatrix *ker_identity() {
+static KernelMatrix *ker_identity(void) {
   const int32_t layer[IDENTITY_SIZE * IDENTITY_SIZE] = IDENTITY_LAYER;
   return ker_init(IDENTITY_SIZE, IDENTITY_COEF, layer);
 }
 
-static KernelMatrix *ker_3x3_gauss_blur() {
+static KernelMatrix *ker_3x3_gauss_blur(void) {
   const int32_t layer[GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE] =
       GAUSSIAN_3x3_BLUR_LAYER;
   return ker_init(GAUSSIAN_3x3_BLUR_SIZE, GAUSSIAN_3x3_BLUR_COEF, layer);
 }
 
-static KernelMatrix *ker_ridge() {
+static KernelMatrix *ker_ridge(void) {
   const int32_t layer[RIDGE_SIZE * RIDGE_SIZE] = RIDGE_LAYER;
   return ker_init(RIDGE_SIZE, RIDGE_COEF, layer);
 }
 
-static KernelMatrix *ker_5x5_gauss_blur() {
+static KernelMatrix *ker_5x5_gauss_blur(void) {
   const int32_t layer[GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE] =
       GAUSSIAN_5x5_BLUR_LAYER;
   return ker_init(GAUSSIAN_5x5_BLUR_SIZE, GAUSSIAN_5x5_BLUR_COEF, layer);
 }
 
-static KernelMatrix *ker_sharpener() {
+static KernelMatrix *ker_sharpener(void) {
   const int32_t layer[SHARPENER_SIZE * SHARPENER_SIZE] = SHARPENER_LAYER;
   return ker_init(SHARPENER_SIZE, SHARPENER_COEF, layer);
 }
