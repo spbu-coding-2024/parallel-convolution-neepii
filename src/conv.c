@@ -23,11 +23,6 @@ struct pixel_s {
   uint8_t a;
 };
 
-static inline bool in_bounds_of_image(int32_t x_cord, int32_t y_cord,
-                                      int32_t height, int32_t width) {
-  return (x_cord >= 0 && x_cord < width && y_cord >= 0 && y_cord < height);
-}
-
 static inline int64_t multiply_by_rational_and_ceil(long num, long numer,
                                                     long denom) {
   long product = num * numer;
@@ -79,9 +74,6 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
       const int32_t temp_y_cord =
           apply_mirror_padding(y_cord + offset_y_cord - (ker_size / 2), height);
 
-      if (!in_bounds_of_image(temp_x_cord, temp_y_cord, height, width)) {
-        continue;
-      }
       uint8_t temp_red;
       uint8_t temp_green;
       uint8_t temp_blue;
@@ -154,16 +146,16 @@ void conv_apply_kernel_parallelly(BMP *image, KernelMatrix *kernel) {
 
 // TODO: make a generic function for these init function
 
-static inline KernelMatrix *ker_init(size_t ker_size, int32_t coef,
+static inline KernelMatrix *ker_init(const size_t ker_size, const int32_t coef,
                                      const int32_t *layer_mtx,
-                                     size_t layer_size) {
+                                     const size_t layer_size) {
   KernelMatrix *ker = malloc(sizeof(KernelMatrix));
   ker->denominator_coef = coef;
   ker->size = ker_size;
 
   for (int i = 0; i < LAYER_COUNT; ++i) {
-    ker->mtx[i] = malloc(sizeof(int32_t) * ker_size * ker_size);
-    memcpy(ker->mtx[i], layer_mtx, layer_size);
+    ker->mtx[i] = malloc(sizeof(int32_t) * layer_size);
+    memcpy(ker->mtx[i], layer_mtx, sizeof(int32_t) * layer_size);
   }
 
   return ker;
@@ -178,8 +170,8 @@ static KernelMatrix *ker_identity() {
 static KernelMatrix *ker_3x3_gauss_blur() {
   const int32_t layer[GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE] =
       GAUSSIAN_3x3_BLUR_LAYER;
-  return ker_init(GAUSSIAN_5x5_BLUR_SIZE, GAUSSIAN_5x5_BLUR_COEF, layer,
-                  GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE);
+  return ker_init(GAUSSIAN_3x3_BLUR_SIZE, GAUSSIAN_3x3_BLUR_COEF, layer,
+                  GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE);
 }
 
 static KernelMatrix *ker_ridge() {
