@@ -147,8 +147,8 @@ void conv_apply_kernel_parallelly(BMP *image, KernelMatrix *kernel) {
 // TODO: make a generic function for these init function
 
 static inline KernelMatrix *ker_init(const size_t ker_size, const int32_t coef,
-                                     const int32_t *layer_mtx,
-                                     const size_t layer_size) {
+                                     const int32_t *layer_mtx) {
+  const int32_t layer_size = ker_size * ker_size;
   KernelMatrix *ker = malloc(sizeof(KernelMatrix));
   ker->denominator_coef = coef;
   ker->size = ker_size;
@@ -163,33 +163,29 @@ static inline KernelMatrix *ker_init(const size_t ker_size, const int32_t coef,
 
 static KernelMatrix *ker_identity() {
   const int32_t layer[IDENTITY_SIZE * IDENTITY_SIZE] = IDENTITY_LAYER;
-  return ker_init(IDENTITY_SIZE, IDENTITY_COEF, layer,
-                  IDENTITY_SIZE * IDENTITY_SIZE);
+  return ker_init(IDENTITY_SIZE, IDENTITY_COEF, layer);
 }
 
 static KernelMatrix *ker_3x3_gauss_blur() {
   const int32_t layer[GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE] =
       GAUSSIAN_3x3_BLUR_LAYER;
-  return ker_init(GAUSSIAN_3x3_BLUR_SIZE, GAUSSIAN_3x3_BLUR_COEF, layer,
-                  GAUSSIAN_3x3_BLUR_SIZE * GAUSSIAN_3x3_BLUR_SIZE);
+  return ker_init(GAUSSIAN_3x3_BLUR_SIZE, GAUSSIAN_3x3_BLUR_COEF, layer);
 }
 
 static KernelMatrix *ker_ridge() {
   const int32_t layer[RIDGE_SIZE * RIDGE_SIZE] = RIDGE_LAYER;
-  return ker_init(RIDGE_SIZE, RIDGE_COEF, layer, RIDGE_SIZE * RIDGE_SIZE);
+  return ker_init(RIDGE_SIZE, RIDGE_COEF, layer);
 }
 
 static KernelMatrix *ker_5x5_gauss_blur() {
   const int32_t layer[GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE] =
       GAUSSIAN_5x5_BLUR_LAYER;
-  return ker_init(GAUSSIAN_5x5_BLUR_SIZE, GAUSSIAN_5x5_BLUR_COEF, layer,
-                  GAUSSIAN_5x5_BLUR_SIZE * GAUSSIAN_5x5_BLUR_SIZE);
+  return ker_init(GAUSSIAN_5x5_BLUR_SIZE, GAUSSIAN_5x5_BLUR_COEF, layer);
 }
 
 static KernelMatrix *ker_sharpener() {
   const int32_t layer[SHARPENER_SIZE * SHARPENER_SIZE] = SHARPENER_LAYER;
-  return ker_init(SHARPENER_SIZE, SHARPENER_COEF, layer,
-                  SHARPENER_SIZE * SHARPENER_SIZE);
+  return ker_init(SHARPENER_SIZE, SHARPENER_COEF, layer);
 }
 
 static const struct ker_info_s info_arr[] = {
