@@ -1,6 +1,7 @@
 #include "cbmp.h"
 #include "conv.h"
 
+#include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,8 +12,11 @@
 #include <time.h>
 #endif
 
-#define EXIT_SUCCESS 0
-#define EXIT_FAILURE 1
+enum exit_status {
+  EXITSUCCESS = 0,
+  EXITFAILURE = 1,
+  EXITIOFAILURE = 1,
+};
 
 void usage(void) {
   printf("USAGE:\n"
@@ -41,19 +45,19 @@ int main(int argc, char *argv[]) {
     switch (opt) {
     case 'h':
       usage();
-      return EXIT_SUCCESS;
+      return EXITSUCCESS;
     case 'i':
       input_path = strdup(optarg);
       if (!input_path) {
         perror("strdup failed");
-        return EXIT_FAILURE;
+        return EXITFAILURE;
       }
       break;
     case 'o':
       output_path = strdup(optarg);
       if (!output_path) {
         perror("strdup failed");
-        return EXIT_FAILURE;
+        return EXITFAILURE;
       }
       break;
     case 's':
@@ -63,8 +67,10 @@ int main(int argc, char *argv[]) {
       filter_name = strdup(optarg);
       if (!filter_name) {
         perror("strdup failed");
-        return EXIT_FAILURE;
+        return EXITFAILURE;
       }
+      break;
+    default:
       break;
     }
   }
@@ -76,13 +82,15 @@ int main(int argc, char *argv[]) {
 
   BMP *image = bopen(input_path);
   if (!image) {
-    fprintf(stderr, "Bad input file\n");
-    return EXIT_FAILURE;
+    if (!fprintf(stderr, "Bad input file\n")) {
+      return EXITIOFAILURE;
+    }
+    return EXITFAILURE;
   }
 
   KernelMatrix *kernel_mtx = choose_kernel_matrix(filter_name);
   if (kernel_mtx == NULL) {
-    return EXIT_FAILURE;
+    return EXITFAILURE;
   }
 
 #ifdef BENCHMARK
@@ -110,5 +118,5 @@ int main(int argc, char *argv[]) {
   free(input_path);
   free_kernel_matrix(kernel_mtx);
 
-  return EXIT_SUCCESS;
+  return EXITSUCCESS;
 }

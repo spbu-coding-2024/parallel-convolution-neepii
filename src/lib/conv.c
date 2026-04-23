@@ -207,7 +207,7 @@ KernelMatrix *choose_kernel_matrix(const char *name) {
       return info_arr[i].init_func();
     }
   }
-  fprintf(stderr, "No such filter\n");
+  fputs("No such filter\n", stderr);
   return NULL;
 }
 

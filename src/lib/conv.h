@@ -7,7 +7,7 @@
 
 #define LAYER_COUNT 3
 
-#if defined(__GCC_DESTRUCTIVE_SIZE)
+#ifdef __GCC_DESTRUCTIVE_SIZE
 #define CACHE_LINE_SIZE __GCC_DESTRUCTIVE_SIZE / 8
 #else
 #define CACHE_LINE_SIZE 8
