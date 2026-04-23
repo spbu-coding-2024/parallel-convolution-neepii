@@ -1,5 +1,6 @@
 #include "conv.h"
 #include "cbmp.h"
+#include "cli.h"
 #include "matrix.h"
 #include <limits.h>
 #include <omp.h>
@@ -8,6 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef BENCHMARK
+#include <time.h>
+#endif
 
 #define CHANNELS_COUNT 3
 
@@ -189,6 +194,18 @@ static KernelMatrix *ker_sharpener(void) {
   return ker_init(SHARPENER_SIZE, SHARPENER_COEF, layer);
 }
 
+static KernelMatrix *ker_first_prewitt(void) {
+  const int32_t layer[PREWITT_FIRST_SIZE * PREWITT_FIRST_SIZE] =
+      PREWITT_FIRST_LAYER;
+  return ker_init(PREWITT_FIRST_SIZE, PREWITT_FIRST_COEF, layer);
+}
+
+static KernelMatrix *ker_second_prewitt(void) {
+  const int32_t layer[PREWITT_SECOND_SIZE * PREWITT_SECOND_SIZE] =
+      PREWITT_SECOND_LAYER;
+  return ker_init(PREWITT_SECOND_SIZE, PREWITT_SECOND_COEF, layer);
+}
+
 static const struct ker_info_s info_arr[] = {
     {.name = "ident", .init_func = ker_identity},
     {.name = "blur3", .init_func = ker_3x3_gauss_blur},
@@ -216,4 +233,106 @@ void free_kernel_matrix(KernelMatrix *ker) {
     free(ker->mtx[i]);
   }
   free(ker);
+}
+
+static int32_t apply_prewitt_filter(BMP *image, struct main_args args) {
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+
+  KernelMatrix *kernel_first = ker_first_prewitt();
+  KernelMatrix *kernel_second = ker_second_prewitt();
+
+  struct pixel_s *temp_pixels = malloc(height * width * sizeof(struct pixel_s));
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
+  if (args.parallelize) {
+    for (size_t j = 0; j < height; ++j) {
+#pragma omp parallel for
+      for (size_t i = 0; i < width; ++i) {
+        convolute_pixel_sequentialy(image, i, j, kernel_first, temp_pixels);
+      }
+    }
+
+    for (size_t j = 0; j < height; ++j) {
+#pragma omp parallel for
+      for (size_t i = 0; i < width; ++i) {
+        convolute_pixel_sequentialy(image, i, j, kernel_second, new_pixels);
+      }
+    }
+  } else {
+    for (size_t j = 0; j < height; ++j) {
+      for (size_t i = 0; i < width; ++i) {
+        convolute_pixel_sequentialy(image, i, j, kernel_first, temp_pixels);
+      }
+    }
+
+    for (size_t j = 0; j < height; ++j) {
+      for (size_t i = 0; i < width; ++i) {
+        convolute_pixel_sequentialy(image, i, j, kernel_second, new_pixels);
+      }
+    }
+  }
+
+  for (size_t y_cord = 0; y_cord < height; ++y_cord) {
+    for (size_t x_cord = 0; x_cord < width; ++x_cord) {
+      const size_t idx = (y_cord * width) + x_cord;
+      const struct pixel_s gx = temp_pixels[idx];
+      const struct pixel_s gy = new_pixels[idx];
+
+      int64_t r = (int64_t)gx.r * gx.r + (int64_t)gy.r * gy.r;
+      int64_t g = (int64_t)gx.g * gx.g + (int64_t)gy.g * gy.g;
+      int64_t b = (int64_t)gx.b * gx.b + (int64_t)gy.b * gy.b;
+
+      r = (r > 0) ? (int64_t)((int64_t)r * 1000 / 256 / 256) : 0;
+      g = (g > 0) ? (int64_t)((int64_t)g * 1000 / 256 / 256) : 0;
+      b = (b > 0) ? (int64_t)((int64_t)b * 1000 / 256 / 256) : 0;
+
+      set_pixel_rgb(image, x_cord, y_cord, to_byte(r), to_byte(g), to_byte(b));
+    }
+  }
+
+  free(temp_pixels);
+  free(new_pixels);
+  free_kernel_matrix(kernel_first);
+  free_kernel_matrix(kernel_second);
+
+  return true;
+}
+
+static int32_t apply_basic_filter(BMP *image, struct main_args args) {
+  KernelMatrix *kernel_mtx = choose_kernel_matrix(args.filter_name);
+  if (kernel_mtx == NULL) {
+    free_main_args(&args);
+    return true;
+  }
+
+  if (args.parallelize) {
+    conv_apply_kernel_parallelly(image, kernel_mtx);
+  } else {
+    conv_apply_kernel_sequentialy(image, kernel_mtx);
+  }
+
+  free_kernel_matrix(kernel_mtx);
+  return true;
+}
+
+int32_t apply_filter(BMP *image, struct main_args args) {
+
+#ifdef BENCHMARK
+  struct timespec start;
+  struct timespec end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
+
+  if (strcmp(args.filter_name, "prewitt") == 0) {
+    return apply_prewitt_filter(image, args);
+  }
+  return apply_basic_filter(image, args);
+
+#ifdef BENCHMARK
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  double time_taken =
+      (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
+  printf("%f\n", time_taken);
+#endif
 }

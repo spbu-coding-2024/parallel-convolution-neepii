@@ -2,6 +2,7 @@
 #define CONV_CONV_H
 
 #include "cbmp.h"
+#include "cli.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -25,5 +26,7 @@ void conv_apply_kernel_parallelly(BMP *image, const KernelMatrix *kernel);
 KernelMatrix *choose_kernel_matrix(const char *name);
 
 void free_kernel_matrix(KernelMatrix *ker);
+
+int32_t apply_filter(BMP *image, struct main_args args);
 
 #endif

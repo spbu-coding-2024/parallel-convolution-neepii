@@ -1,73 +1,60 @@
 #include "cbmp.h"
+#include "cli.h"
 #include "conv.h"
 
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#ifdef BENCHMARK
-#include <time.h>
-#endif
-
-enum exit_status {
-  EXITSUCCESS = 0,
-  EXITFAILURE = 1,
-  EXITIOFAILURE = 1,
-};
-
 void usage(void) {
-  printf("USAGE:\n"
-         "\t-h    Display this message\n"
-         "\t-i    Pass an input file (e.g. -i input.bmp)\n"
-         "\t-o    Pass an output file\n"
-         "\t-s    Run program sequentially\n"
-         "\t-f    Choose a filter (e.g. -f blur3, see FILTER section)\n"
-         "\nFILTERS:\n"
-         "\tident - identity filter, do nothing\n"
-         "\tblur3 - make image slightly blurry\n"
-         "\tblur5 - make image more blurry\n"
-         "\tridge - highlight ridges of image\n"
+  puts("USAGE:\n"
+       "\t-h    Display this message\n"
+       "\t-i    Pass an input file (e.g. -i input.bmp)\n"
+       "\t-o    Pass an output file\n"
+       "\t-s    Run program sequentially\n"
+       "\t-f    Choose a filter (e.g. -f blur3, see FILTER section)\n"
+       "\nFILTERS:\n"
+       "\tident - identity filter, do nothing\n"
+       "\tblur3 - make image slightly blurry\n"
+       "\tblur5 - make image more blurry\n"
+       "\tridge - highlight ridges of image\n"
 
   );
 }
 
-int main(int argc, char *argv[]) {
+static bool get_args(int argc, char *argv[], struct main_args *margs) {
   int opt;
-  bool parallelize = true;
-  char *input_path = NULL;
-  char *output_path = NULL;
-  char *filter_name = NULL;
 
   while ((opt = getopt(argc, argv, "shi:o:f:")) != -1) {
     switch (opt) {
     case 'h':
       usage();
-      return EXITSUCCESS;
+      free_main_args(margs);
+      return false;
     case 'i':
-      input_path = strdup(optarg);
-      if (!input_path) {
-        perror("strdup failed");
-        return EXITFAILURE;
+      margs->input_name = strdup(optarg);
+      if (!margs->input_name) {
+        free_main_args(margs);
+        return false;
       }
       break;
     case 'o':
-      output_path = strdup(optarg);
-      if (!output_path) {
-        perror("strdup failed");
-        return EXITFAILURE;
+      margs->output_name = strdup(optarg);
+      if (!margs->output_name) {
+        free_main_args(margs);
+        return false;
       }
       break;
     case 's':
-      parallelize = false;
+      margs->parallelize = false;
       break;
     case 'f':
-      filter_name = strdup(optarg);
-      if (!filter_name) {
-        perror("strdup failed");
-        return EXITFAILURE;
+      margs->filter_name = strdup(optarg);
+      if (!margs->filter_name) {
+        free_main_args(margs);
+        return false;
       }
       break;
     default:
@@ -75,48 +62,39 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (!input_path || !output_path) {
+  if (!margs->input_name || !margs->output_name || !margs->filter_name) {
     usage();
-    return EXIT_FAILURE;
+    free_main_args(margs);
+    return false;
   }
 
-  BMP *image = bopen(input_path);
+  return true;
+}
+
+int main(int argc, char *argv[]) {
+  struct main_args args = {
+      .filter_name = NULL,
+      .output_name = NULL,
+      .input_name = NULL,
+      .parallelize = true,
+  };
+  if (!get_args(argc, argv, &args)) {
+    return EXITFAILURE;
+  }
+
+  BMP *image = bopen(args.input_name);
   if (!image) {
-    if (!fprintf(stderr, "Bad input file\n")) {
-      return EXITIOFAILURE;
-    }
+    fputs("Bad input file\n", stderr);
     return EXITFAILURE;
   }
 
-  KernelMatrix *kernel_mtx = choose_kernel_matrix(filter_name);
-  if (kernel_mtx == NULL) {
+  if (!apply_filter(image, args)) {
     return EXITFAILURE;
   }
 
-#ifdef BENCHMARK
-  struct timespec start;
-  struct timespec end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
-#endif
-
-  if (parallelize) {
-    conv_apply_kernel_parallelly(image, kernel_mtx);
-  } else {
-    conv_apply_kernel_sequentialy(image, kernel_mtx);
-  }
-
-#ifdef BENCHMARK
-  clock_gettime(CLOCK_MONOTONIC, &end);
-  double time_taken =
-      (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
-  printf("%f\n", time_taken);
-#endif
-
-  bwrite(image, output_path);
+  bwrite(image, args.output_name);
   bclose(image);
-  free(output_path);
-  free(input_path);
-  free_kernel_matrix(kernel_mtx);
+  free_main_args(&args);
 
   return EXITSUCCESS;
 }
