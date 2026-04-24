@@ -324,10 +324,12 @@ int32_t apply_filter(BMP *image, struct main_args args) {
   clock_gettime(CLOCK_MONOTONIC, &start);
 #endif
 
+  int32_t result;
   if (strcmp(args.filter_name, "prewitt") == 0) {
-    return apply_prewitt_filter(image, args);
+    result = apply_prewitt_filter(image, args);
+  } else {
+    result = apply_basic_filter(image, args);
   }
-  return apply_basic_filter(image, args);
 
 #ifdef BENCHMARK
   clock_gettime(CLOCK_MONOTONIC, &end);
@@ -335,4 +337,6 @@ int32_t apply_filter(BMP *image, struct main_args args) {
       (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
   printf("%f\n", time_taken);
 #endif
+
+  return result;
 }

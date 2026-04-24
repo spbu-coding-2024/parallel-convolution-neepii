@@ -71,29 +71,14 @@ static void test_ridge1(void **state) {
   test_template(TEST_IMAGE_1_PATH, RIDGE_KEY_NAME);
 }
 
-static void test_3x3_gauss1(void **state) {
-  (void)state;
-  test_template(TEST_IMAGE_1_PATH, GAUSSIAN3_KEY_NAME);
-}
-
-static void test_5x5_gauss1(void **state) {
-  (void)state;
-  test_template(TEST_IMAGE_1_PATH, GAUSSIAN5_KEY_NAME);
-}
-
-static void test_sharp1(void **state) {
-  (void)state;
-  test_template(TEST_IMAGE_1_PATH, SHARP_KEY_NAME);
-}
-
-static void test_identity1(void **state) {
-  (void)state;
-  test_template(TEST_IMAGE_1_PATH, IDENTITY_KEY_NAME);
-}
-
 static void test_ridge2(void **state) {
   (void)state;
   test_template(TEST_IMAGE_2_PATH, RIDGE_KEY_NAME);
+}
+
+static void test_3x3_gauss1(void **state) {
+  (void)state;
+  test_template(TEST_IMAGE_1_PATH, GAUSSIAN3_KEY_NAME);
 }
 
 static void test_3x3_gauss2(void **state) {
@@ -101,14 +86,29 @@ static void test_3x3_gauss2(void **state) {
   test_template(TEST_IMAGE_2_PATH, GAUSSIAN3_KEY_NAME);
 }
 
+static void test_5x5_gauss1(void **state) {
+  (void)state;
+  test_template(TEST_IMAGE_1_PATH, GAUSSIAN5_KEY_NAME);
+}
+
 static void test_5x5_gauss2(void **state) {
   (void)state;
   test_template(TEST_IMAGE_2_PATH, GAUSSIAN5_KEY_NAME);
 }
 
+static void test_sharp1(void **state) {
+  (void)state;
+  test_template(TEST_IMAGE_1_PATH, SHARP_KEY_NAME);
+}
+
 static void test_sharp2(void **state) {
   (void)state;
   test_template(TEST_IMAGE_2_PATH, SHARP_KEY_NAME);
+}
+
+static void test_identity1(void **state) {
+  (void)state;
+  test_template(TEST_IMAGE_1_PATH, IDENTITY_KEY_NAME);
 }
 
 static void test_identity2(void **state) {
@@ -120,16 +120,16 @@ int main(void) {
 
   const struct CMUnitTest tests[] = {
       // clang-format off
-    cmocka_unit_test(test_ridge1),
     cmocka_unit_test(test_3x3_gauss1),
-    cmocka_unit_test(test_5x5_gauss1),
-    cmocka_unit_test(test_sharp1),
-    cmocka_unit_test(test_identity1),
-    cmocka_unit_test(test_ridge2),
     cmocka_unit_test(test_3x3_gauss2),
+    cmocka_unit_test(test_5x5_gauss1),
     cmocka_unit_test(test_5x5_gauss2),
-    cmocka_unit_test(test_sharp2),
+    cmocka_unit_test(test_identity1),
     cmocka_unit_test(test_identity2),
+    cmocka_unit_test(test_ridge1),
+    cmocka_unit_test(test_ridge2),
+    cmocka_unit_test(test_sharp1),
+    cmocka_unit_test(test_sharp2),
       // clang-format on
   };
 
