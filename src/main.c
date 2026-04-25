@@ -20,6 +20,7 @@ void usage(void) {
        "\tblur3 - make image slightly blurry\n"
        "\tblur5 - make image more blurry\n"
        "\tridge - highlight ridges of image\n"
+       "\tprewitt - another way to highlight edges of image\n"
 
   );
 }
