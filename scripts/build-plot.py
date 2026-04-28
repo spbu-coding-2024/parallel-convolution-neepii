@@ -20,9 +20,11 @@ from PIL import Image
 #  echo "1" | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo
 #
 
+sample_len = 10
+
 def collect_data() -> array[float]:
-    sample = [0.0] * 10
-    for i in range(len(sample)):
+    sample = [0.0] * sample_len
+    for i in range(sample_len):
         result = subprocess.run(cmd, capture_output=True, timeout=40, text=True)
 
         if result.returncode == 0:
@@ -93,7 +95,7 @@ if pixel_counts and execution_times:
         b = np.round(np.random.rand(),1)
         samples = list(map(lambda x : np.array(x), execution_times[j]))
         mean_results = list(map(lambda x : np.mean(x), samples))
-        std_results = list(map(lambda x : np.std(x, ddof=1), samples))
+        std_results = list(map(lambda x : 3 * np.std(x, ddof=1) / np.sqrt(sample_len), samples))
         plt.errorbar(pixel_counts, mean_results, yerr=std_results, marker='o', linestyle='--', color=[r,g,b], linewidth=2)
 
     output_plot = "output_plot"
