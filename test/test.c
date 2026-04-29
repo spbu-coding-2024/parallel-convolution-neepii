@@ -52,17 +52,30 @@ static int32_t compare_images(BMP *fst, BMP *snd) {
 }
 
 static void test_template(char *image_path, const char *filter_name) {
-  BMP *image_par = bopen(image_path);
+  BMP *image_par_col = bopen(image_path);
+  BMP *image_par_row = bopen(image_path);
+  BMP *image_par_pix = bopen(image_path);
+  BMP *image_par_blk = bopen(image_path);
   BMP *image_seq = bopen(image_path);
   KernelMatrix *ker = choose_kernel_matrix(filter_name);
 
-  conv_apply_kernel_parallelly(image_par, ker);
+  conv_apply_kernel_parallelly_columns(image_par_col, ker);
+  conv_apply_kernel_parallelly_columns(image_par_row, ker);
+  conv_apply_kernel_parallelly_columns(image_par_pix, ker);
+  conv_apply_kernel_parallelly_columns(image_par_blk, ker);
+
   conv_apply_kernel_sequentialy(image_seq, ker);
 
-  assert_int_equal(compare_images(image_seq, image_par), 0);
+  assert_int_equal(compare_images(image_seq, image_par_col), 0);
+  assert_int_equal(compare_images(image_par_col, image_par_row), 0);
+  assert_int_equal(compare_images(image_par_row, image_par_pix), 0);
+  assert_int_equal(compare_images(image_par_pix, image_par_blk), 0);
 
   bclose(image_seq);
-  bclose(image_par);
+  bclose(image_par_col);
+  bclose(image_par_row);
+  bclose(image_par_pix);
+  bclose(image_par_blk);
   free_kernel_matrix(ker);
 }
 

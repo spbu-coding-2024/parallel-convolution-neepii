@@ -21,7 +21,12 @@ typedef struct {
 } KernelMatrix;
 
 void conv_apply_kernel_sequentialy(BMP *image, const KernelMatrix *kernel);
-void conv_apply_kernel_parallelly(BMP *image, const KernelMatrix *kernel);
+void conv_apply_kernel_parallelly_rows(BMP *image, const KernelMatrix *kernel);
+void conv_apply_kernel_parallelly_columns(BMP *image,
+                                          const KernelMatrix *kernel);
+void conv_apply_kernel_parallelly_pixel_by_pixel(BMP *image,
+                                                 const KernelMatrix *kernel);
+void conv_apply_kernel_parallelly_block(BMP *image, const KernelMatrix *kernel);
 
 KernelMatrix *choose_kernel_matrix(const char *name);
 
