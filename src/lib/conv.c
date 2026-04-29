@@ -105,17 +105,25 @@ static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
   pixel_arr[(y_cord * width) + x_cord].b = to_byte(blue);
 }
 
+static void apply_kernel_to_matrix_sequentialy(BMP *image,
+                                               const KernelMatrix *kernel,
+                                               struct pixel_s *new_pixels) {
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+  for (size_t j = 0; j < height; ++j) {
+    for (size_t i = 0; i < width; ++i) {
+      convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
+    }
+  }
+}
+
 void conv_apply_kernel_sequentialy(BMP *image, const KernelMatrix *kernel) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
 
   struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
 
-  for (size_t j = 0; j < height; ++j) {
-    for (size_t i = 0; i < width; ++i) {
-      convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
-    }
-  }
+  apply_kernel_to_matrix_sequentialy(image, kernel, new_pixels);
 
   for (size_t y_cord = 0; y_cord < height; ++y_cord) {
     for (size_t x_cord = 0; x_cord < width; ++x_cord) {
@@ -127,12 +135,10 @@ void conv_apply_kernel_sequentialy(BMP *image, const KernelMatrix *kernel) {
   free(new_pixels);
 }
 
-void conv_apply_kernel_parallelly_rows(BMP *image, const KernelMatrix *kernel) {
+static void apply_kernel_to_matrix_rows(BMP *image, const KernelMatrix *kernel,
+                                        struct pixel_s *new_pixels) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
-
-  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
-
   for (size_t j = 0; j < height; ++j) {
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels, j)
@@ -140,6 +146,15 @@ void conv_apply_kernel_parallelly_rows(BMP *image, const KernelMatrix *kernel) {
       convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
     }
   }
+}
+
+void conv_apply_kernel_parallelly_rows(BMP *image, const KernelMatrix *kernel) {
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
+  apply_kernel_to_matrix_rows(image, kernel, new_pixels);
 
   for (size_t y_cord = 0; y_cord < height; ++y_cord) {
 #pragma omp parallel for default(none)                                         \
@@ -153,13 +168,11 @@ void conv_apply_kernel_parallelly_rows(BMP *image, const KernelMatrix *kernel) {
   free(new_pixels);
 }
 
-void conv_apply_kernel_parallelly_columns(BMP *image,
-                                          const KernelMatrix *kernel) {
+static void apply_kernel_to_matrix_columns(BMP *image,
+                                           const KernelMatrix *kernel,
+                                           struct pixel_s *new_pixels) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
-
-  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
-
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels)
   for (size_t j = 0; j < height; ++j) {
@@ -167,6 +180,16 @@ void conv_apply_kernel_parallelly_columns(BMP *image,
       convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
     }
   }
+}
+
+void conv_apply_kernel_parallelly_columns(BMP *image,
+                                          const KernelMatrix *kernel) {
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
+  apply_kernel_to_matrix_columns(image, kernel, new_pixels);
 
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels)
@@ -180,12 +203,11 @@ void conv_apply_kernel_parallelly_columns(BMP *image,
   free(new_pixels);
 }
 
-void conv_apply_kernel_parallelly_pixel_by_pixel(BMP *image,
-                                                 const KernelMatrix *kernel) {
+static void apply_kernel_to_matrix_pixel_by_pixel(BMP *image,
+                                                  const KernelMatrix *kernel,
+                                                  struct pixel_s *new_pixels) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
-
-  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
 
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels)
@@ -194,6 +216,16 @@ void conv_apply_kernel_parallelly_pixel_by_pixel(BMP *image,
     const size_t j = idx % width;
     convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
   }
+}
+
+void conv_apply_kernel_parallelly_pixel_by_pixel(BMP *image,
+                                                 const KernelMatrix *kernel) {
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
+  apply_kernel_to_matrix_pixel_by_pixel(image, kernel, new_pixels);
 
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels)
@@ -230,43 +262,52 @@ static void set_image_block(BMP *image, struct pixel_s *new_pixels,
   }
 }
 
-void conv_apply_kernel_parallelly_block(BMP *image,
-                                        const KernelMatrix *kernel) {
+static void apply_kernel_to_matrix_block(BMP *image, const KernelMatrix *kernel,
+                                         struct pixel_s *new_pixels) {
   const size_t height = get_height(image);
   const size_t width = get_width(image);
-  const size_t tile_w = TILE_SIZE;
-  const size_t tile_h = TILE_SIZE;
-
-  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
-
-  const size_t num_blocks_x = (width + tile_w - 1) / tile_w;
-  const size_t num_blocks_y = (height + tile_h - 1) / tile_h;
+  const size_t num_blocks_x = (width + TILE_SIZE - 1) / TILE_SIZE;
+  const size_t num_blocks_y = (height + TILE_SIZE - 1) / TILE_SIZE;
   const size_t total_blocks = num_blocks_x * num_blocks_y;
 
 #pragma omp parallel for default(none)                                         \
     shared(image, new_pixels, width, height, kernel, num_blocks_x,             \
-               total_blocks, num_blocks_y, tile_w, tile_h) schedule(dynamic)
+               total_blocks, num_blocks_y) schedule(dynamic)
   for (size_t b = 0; b < total_blocks; ++b) {
     const size_t by_idx = b / num_blocks_x;
     const size_t bx_idx = b % num_blocks_x;
-    const size_t x0 = bx_idx * tile_w;
-    const size_t y0 = by_idx * tile_h;
-    const size_t bw = (x0 + tile_w > width) ? (width - x0) : tile_w;
-    const size_t bh = (y0 + tile_h > height) ? (height - y0) : tile_h;
+    const size_t x0 = bx_idx * TILE_SIZE;
+    const size_t y0 = by_idx * TILE_SIZE;
+    const size_t bw = (x0 + TILE_SIZE > width) ? (width - x0) : TILE_SIZE;
+    const size_t bh = (y0 + TILE_SIZE > height) ? (height - y0) : TILE_SIZE;
 
     process_image_block(image, new_pixels, kernel, x0, y0, bw, bh);
   }
+}
+
+void conv_apply_kernel_parallelly_block(BMP *image,
+                                        const KernelMatrix *kernel) {
+  const size_t height = get_height(image);
+  const size_t width = get_width(image);
+
+  struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
+
+  apply_kernel_to_matrix_block(image, kernel, new_pixels);
+
+  const size_t num_blocks_x = (width + TILE_SIZE - 1) / TILE_SIZE;
+  const size_t num_blocks_y = (height + TILE_SIZE - 1) / TILE_SIZE;
+  const size_t total_blocks = num_blocks_x * num_blocks_y;
 
 #pragma omp parallel for default(none)                                         \
     shared(image, new_pixels, width, height, kernel, num_blocks_x,             \
-               total_blocks, num_blocks_y, tile_w, tile_h) schedule(dynamic)
+               total_blocks, num_blocks_y) schedule(dynamic)
   for (size_t b = 0; b < total_blocks; ++b) {
     const size_t by_idx = b / num_blocks_x;
     const size_t bx_idx = b % num_blocks_x;
-    const size_t x0 = bx_idx * tile_w;
-    const size_t y0 = by_idx * tile_h;
-    const size_t bw = (x0 + tile_w > width) ? (width - x0) : tile_w;
-    const size_t bh = (y0 + tile_h > height) ? (height - y0) : tile_h;
+    const size_t x0 = bx_idx * TILE_SIZE;
+    const size_t y0 = by_idx * TILE_SIZE;
+    const size_t bw = (x0 + TILE_SIZE > width) ? (width - x0) : TILE_SIZE;
+    const size_t bh = (y0 + TILE_SIZE > height) ? (height - y0) : TILE_SIZE;
 
     set_image_block(image, new_pixels, x0, y0, bw, bh);
   }
@@ -368,31 +409,11 @@ static int32_t apply_prewitt_filter(BMP *image, struct main_args args) {
   struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
 
   if (args.parallelize) {
-    for (size_t j = 0; j < height; ++j) {
-#pragma omp parallel for
-      for (size_t i = 0; i < width; ++i) {
-        convolute_pixel_sequentialy(image, i, j, kernel_first, temp_pixels);
-      }
-    }
-
-    for (size_t j = 0; j < height; ++j) {
-#pragma omp parallel for
-      for (size_t i = 0; i < width; ++i) {
-        convolute_pixel_sequentialy(image, i, j, kernel_second, new_pixels);
-      }
-    }
+    apply_kernel_to_matrix_rows(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_rows(image, kernel_second, new_pixels);
   } else {
-    for (size_t j = 0; j < height; ++j) {
-      for (size_t i = 0; i < width; ++i) {
-        convolute_pixel_sequentialy(image, i, j, kernel_first, temp_pixels);
-      }
-    }
-
-    for (size_t j = 0; j < height; ++j) {
-      for (size_t i = 0; i < width; ++i) {
-        convolute_pixel_sequentialy(image, i, j, kernel_second, new_pixels);
-      }
-    }
+    apply_kernel_to_matrix_sequentialy(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_sequentialy(image, kernel_second, new_pixels);
   }
 
   for (size_t y_cord = 0; y_cord < height; ++y_cord) {
