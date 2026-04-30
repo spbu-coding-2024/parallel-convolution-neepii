@@ -17,10 +17,7 @@
 #define CHANNELS_COUNT 3
 #define TILE_SIZE 16
 
-struct ker_info_s {
-  char *name;
-  KernelMatrix *(*init_func)(void);
-};
+typedef KernelMatrix *(*KernelInit)(void);
 
 struct pixel_s {
   uint8_t r;
@@ -319,11 +316,21 @@ static inline KernelMatrix *ker_init(const size_t ker_size, const int32_t coef,
                                      const int32_t *layer_mtx) {
   const int32_t layer_size = ker_size * ker_size;
   KernelMatrix *ker = malloc(sizeof(KernelMatrix));
+  if (!ker) {
+    return NULL;
+  }
   ker->denominator_coef = coef;
   ker->size = ker_size;
 
   for (int i = 0; i < LAYER_COUNT; ++i) {
     ker->mtx[i] = malloc(sizeof(int32_t) * layer_size);
+    if (!ker->mtx[i]) {
+      for (int j = 0; j < i; ++j) {
+        free(ker->mtx[j]);
+      }
+      free(ker);
+      return NULL;
+    }
     memcpy(ker->mtx[i], layer_mtx, sizeof(int32_t) * layer_size);
   }
 
@@ -369,26 +376,14 @@ static KernelMatrix *ker_second_prewitt(void) {
   return ker_init(PREWITT_SECOND_SIZE, PREWITT_SECOND_COEF, layer);
 }
 
-static const struct ker_info_s info_arr[] = {
-    {.name = "ident", .init_func = ker_identity},
-    {.name = "blur3", .init_func = ker_3x3_gauss_blur},
-    {.name = "blur5", .init_func = ker_5x5_gauss_blur},
-    {.name = "ridge", .init_func = ker_ridge},
-    {.name = "sharp", .init_func = ker_sharpener},
+static const KernelInit filter_arr[] = {
+    [IDENT] = ker_identity,       [BLUR3] = ker_3x3_gauss_blur,
+    [BLUR5] = ker_5x5_gauss_blur, [RIDGE] = ker_ridge,
+    [SHARP] = ker_sharpener,
 };
 
-KernelMatrix *choose_kernel_matrix(const char *name) {
-  if (!name) {
-    return ker_identity();
-  }
-  const size_t arr_size = sizeof(info_arr) / sizeof(struct ker_info_s);
-  for (size_t i = 0; i < arr_size; ++i) {
-    if (strcmp(name, info_arr[i].name) == 0) {
-      return info_arr[i].init_func();
-    }
-  }
-  fputs("No such filter\n", stderr);
-  return NULL;
+KernelMatrix *choose_kernel_matrix(const int8_t filter) {
+  return filter_arr[filter]();
 }
 
 void free_kernel_matrix(KernelMatrix *ker) {
@@ -405,15 +400,48 @@ static int32_t apply_prewitt_filter(BMP *image, struct main_args args) {
   KernelMatrix *kernel_first = ker_first_prewitt();
   KernelMatrix *kernel_second = ker_second_prewitt();
 
+  if (!kernel_first || !kernel_second) {
+    if (kernel_first) {
+      free_kernel_matrix(kernel_first);
+    }
+    if (kernel_second) {
+      free_kernel_matrix(kernel_second);
+    }
+    return false;
+  }
+
   struct pixel_s *temp_pixels = malloc(height * width * sizeof(struct pixel_s));
   struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
 
-  if (args.parallelize) {
-    apply_kernel_to_matrix_pixel_by_pixel(image, kernel_first, temp_pixels);
-    apply_kernel_to_matrix_pixel_by_pixel(image, kernel_second, new_pixels);
-  } else {
+  if (!temp_pixels || !new_pixels) {
+    free(temp_pixels);
+    free(new_pixels);
+    free_kernel_matrix(kernel_first);
+    free_kernel_matrix(kernel_second);
+    return false;
+  }
+
+  switch (args.mode_option) {
+  case SEQUENTIALLY:
     apply_kernel_to_matrix_sequentialy(image, kernel_first, temp_pixels);
     apply_kernel_to_matrix_sequentialy(image, kernel_second, new_pixels);
+    break;
+  case COLUMNS:
+    apply_kernel_to_matrix_columns(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_columns(image, kernel_second, new_pixels);
+    break;
+  case ROWS:
+    apply_kernel_to_matrix_rows(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_rows(image, kernel_second, new_pixels);
+    break;
+  case PIXEL_BY_PIXEL:
+    apply_kernel_to_matrix_pixel_by_pixel(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_pixel_by_pixel(image, kernel_second, new_pixels);
+    break;
+  case BLOCK:
+    apply_kernel_to_matrix_block(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_block(image, kernel_second, new_pixels);
+    break;
   }
 
   for (size_t y_cord = 0; y_cord < height; ++y_cord) {
@@ -443,15 +471,27 @@ static int32_t apply_prewitt_filter(BMP *image, struct main_args args) {
 }
 
 static int32_t apply_basic_filter(BMP *image, struct main_args args) {
-  KernelMatrix *kernel_mtx = choose_kernel_matrix(args.filter_name);
+  KernelMatrix *kernel_mtx = choose_kernel_matrix(args.filter_option);
   if (kernel_mtx == NULL) {
     return false;
   }
 
-  if (args.parallelize) {
-    conv_apply_kernel_parallelly_pixel_by_pixel(image, kernel_mtx);
-  } else {
+  switch (args.mode_option) {
+  case SEQUENTIALLY:
     conv_apply_kernel_sequentialy(image, kernel_mtx);
+    break;
+  case COLUMNS:
+    conv_apply_kernel_parallelly_columns(image, kernel_mtx);
+    break;
+  case ROWS:
+    conv_apply_kernel_parallelly_rows(image, kernel_mtx);
+    break;
+  case PIXEL_BY_PIXEL:
+    conv_apply_kernel_parallelly_pixel_by_pixel(image, kernel_mtx);
+    break;
+  case BLOCK:
+    conv_apply_kernel_parallelly_block(image, kernel_mtx);
+    break;
   }
 
   free_kernel_matrix(kernel_mtx);
@@ -467,7 +507,7 @@ int32_t apply_filter(BMP *image, struct main_args args) {
 #endif
 
   int32_t result;
-  if (strcmp(args.filter_name, "prewitt") == 0) {
+  if (args.filter_option == PREWITT) {
     result = apply_prewitt_filter(image, args);
   } else {
     result = apply_basic_filter(image, args);

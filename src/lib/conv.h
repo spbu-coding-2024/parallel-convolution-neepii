@@ -28,7 +28,7 @@ void conv_apply_kernel_parallelly_pixel_by_pixel(BMP *image,
                                                  const KernelMatrix *kernel);
 void conv_apply_kernel_parallelly_block(BMP *image, const KernelMatrix *kernel);
 
-KernelMatrix *choose_kernel_matrix(const char *name);
+KernelMatrix *choose_kernel_matrix(const int8_t filter);
 
 void free_kernel_matrix(KernelMatrix *ker);
 

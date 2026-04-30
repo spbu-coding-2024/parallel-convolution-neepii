@@ -14,12 +14,6 @@
 #define TEST_IMAGE_1_PATH "test/images/emacs.bmp"
 #define TEST_IMAGE_2_PATH "test/images/coolgame.bmp"
 
-#define RIDGE_KEY_NAME "ridge"
-#define GAUSSIAN3_KEY_NAME "blur3"
-#define GAUSSIAN5_KEY_NAME "blur5"
-#define SHARP_KEY_NAME "sharp"
-#define IDENTITY_KEY_NAME "ident"
-
 static int32_t compare_images(BMP *fst, BMP *snd) {
   const size_t fst_height = get_height(fst);
   const size_t fst_width = get_width(fst);
@@ -51,18 +45,18 @@ static int32_t compare_images(BMP *fst, BMP *snd) {
   return 0;
 }
 
-static void test_template(char *image_path, const char *filter_name) {
+static void test_template(char *image_path, const int8_t filter) {
   BMP *image_par_col = bopen(image_path);
   BMP *image_par_row = bopen(image_path);
   BMP *image_par_pix = bopen(image_path);
   BMP *image_par_blk = bopen(image_path);
   BMP *image_seq = bopen(image_path);
-  KernelMatrix *ker = choose_kernel_matrix(filter_name);
+  KernelMatrix *ker = choose_kernel_matrix(filter);
 
   conv_apply_kernel_parallelly_columns(image_par_col, ker);
-  conv_apply_kernel_parallelly_columns(image_par_row, ker);
-  conv_apply_kernel_parallelly_columns(image_par_pix, ker);
-  conv_apply_kernel_parallelly_columns(image_par_blk, ker);
+  conv_apply_kernel_parallelly_rows(image_par_row, ker);
+  conv_apply_kernel_parallelly_pixel_by_pixel(image_par_pix, ker);
+  conv_apply_kernel_parallelly_block(image_par_blk, ker);
 
   conv_apply_kernel_sequentialy(image_seq, ker);
 
@@ -81,52 +75,52 @@ static void test_template(char *image_path, const char *filter_name) {
 
 static void test_ridge1(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_1_PATH, RIDGE_KEY_NAME);
+  test_template(TEST_IMAGE_1_PATH, RIDGE);
 }
 
 static void test_ridge2(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_2_PATH, RIDGE_KEY_NAME);
+  test_template(TEST_IMAGE_2_PATH, RIDGE);
 }
 
 static void test_3x3_gauss1(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_1_PATH, GAUSSIAN3_KEY_NAME);
+  test_template(TEST_IMAGE_1_PATH, BLUR3);
 }
 
 static void test_3x3_gauss2(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_2_PATH, GAUSSIAN3_KEY_NAME);
+  test_template(TEST_IMAGE_2_PATH, BLUR3);
 }
 
 static void test_5x5_gauss1(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_1_PATH, GAUSSIAN5_KEY_NAME);
+  test_template(TEST_IMAGE_1_PATH, BLUR5);
 }
 
 static void test_5x5_gauss2(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_2_PATH, GAUSSIAN5_KEY_NAME);
+  test_template(TEST_IMAGE_2_PATH, BLUR5);
 }
 
 static void test_sharp1(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_1_PATH, SHARP_KEY_NAME);
+  test_template(TEST_IMAGE_1_PATH, SHARP);
 }
 
 static void test_sharp2(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_2_PATH, SHARP_KEY_NAME);
+  test_template(TEST_IMAGE_2_PATH, SHARP);
 }
 
 static void test_identity1(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_1_PATH, IDENTITY_KEY_NAME);
+  test_template(TEST_IMAGE_1_PATH, IDENT);
 }
 
 static void test_identity2(void **state) {
   (void)state;
-  test_template(TEST_IMAGE_2_PATH, IDENTITY_KEY_NAME);
+  test_template(TEST_IMAGE_2_PATH, IDENT);
 }
 
 int main(void) {
