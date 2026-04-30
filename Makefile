@@ -23,7 +23,7 @@ all: build/$(EXEC_NAME)
 test: build/$(TEST_EXEC_NAME)
 	./build/$(TEST_EXEC_NAME)
 
-debug: CFLAGS = -g -Og
+debug: CFLAGS = -Isrc/external -g -Og
 debug: build/$(EXEC_NAME)
 
 benchmark: CFLAGS += -DBENCHMARK

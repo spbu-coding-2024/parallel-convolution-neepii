@@ -86,10 +86,13 @@ int main(int argc, char *argv[]) {
   BMP *image = bopen(args.input_name);
   if (!image) {
     fputs("Bad input file\n", stderr);
+    free_main_args(&args);
     return EXITFAILURE;
   }
 
   if (!apply_filter(image, args)) {
+    fputs("Cannot apply filter\n", stderr);
+    free_main_args(&args);
     return EXITFAILURE;
   }
 

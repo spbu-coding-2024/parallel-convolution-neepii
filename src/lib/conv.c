@@ -212,9 +212,9 @@ static void apply_kernel_to_matrix_pixel_by_pixel(BMP *image,
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels)
   for (size_t idx = 0; idx < height * width; ++idx) {
-    const size_t i = idx / width;
-    const size_t j = idx % width;
-    convolute_pixel_sequentialy(image, i, j, kernel, new_pixels);
+    const size_t y = idx / width;
+    const size_t x = idx % width;
+    convolute_pixel_sequentialy(image, x, y, kernel, new_pixels);
   }
 }
 
@@ -230,8 +230,8 @@ void conv_apply_kernel_parallelly_pixel_by_pixel(BMP *image,
 #pragma omp parallel for default(none)                                         \
     shared(width, height, image, kernel, new_pixels)
   for (size_t idx = 0; idx < height * width; ++idx) {
-    const size_t x_cord = idx / width;
-    const size_t y_cord = idx % width;
+    const size_t y_cord = idx / width;
+    const size_t x_cord = idx % width;
     const struct pixel_s cell = new_pixels[(y_cord * width) + x_cord];
     set_pixel_rgb(image, x_cord, y_cord, cell.r, cell.g, cell.b);
   }
@@ -257,7 +257,7 @@ static void set_image_block(BMP *image, struct pixel_s *new_pixels,
   for (size_t y_cord = y0; y_cord < y0 + bh; ++y_cord) {
     for (size_t x_cord = x0; x_cord < x0 + bw; ++x_cord) {
       const struct pixel_s cell = new_pixels[(y_cord * width) + x_cord];
-      set_pixel_rgb(image, x0, y0, cell.r, cell.g, cell.b);
+      set_pixel_rgb(image, x_cord, y_cord, cell.r, cell.g, cell.b);
     }
   }
 }
@@ -409,8 +409,8 @@ static int32_t apply_prewitt_filter(BMP *image, struct main_args args) {
   struct pixel_s *new_pixels = malloc(height * width * sizeof(struct pixel_s));
 
   if (args.parallelize) {
-    apply_kernel_to_matrix_rows(image, kernel_first, temp_pixels);
-    apply_kernel_to_matrix_rows(image, kernel_second, new_pixels);
+    apply_kernel_to_matrix_pixel_by_pixel(image, kernel_first, temp_pixels);
+    apply_kernel_to_matrix_pixel_by_pixel(image, kernel_second, new_pixels);
   } else {
     apply_kernel_to_matrix_sequentialy(image, kernel_first, temp_pixels);
     apply_kernel_to_matrix_sequentialy(image, kernel_second, new_pixels);
@@ -445,12 +445,11 @@ static int32_t apply_prewitt_filter(BMP *image, struct main_args args) {
 static int32_t apply_basic_filter(BMP *image, struct main_args args) {
   KernelMatrix *kernel_mtx = choose_kernel_matrix(args.filter_name);
   if (kernel_mtx == NULL) {
-    free_main_args(&args);
-    return true;
+    return false;
   }
 
   if (args.parallelize) {
-    conv_apply_kernel_parallelly_rows(image, kernel_mtx);
+    conv_apply_kernel_parallelly_pixel_by_pixel(image, kernel_mtx);
   } else {
     conv_apply_kernel_sequentialy(image, kernel_mtx);
   }
