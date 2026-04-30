@@ -17,12 +17,29 @@ OS: GNU/Linux 6.12.67_1
 CC: gcc 14.2.1
 CFLAGS: see Makefile for info
 
-### Parallel
-<p align="center">
-<img src="plot_imgs/output_parallel_plot.png" width="600" alt="description">
-</p>
 
 ### Sequential
 <p align="center">
 <img src="plot_imgs/output_sequential_plot.png" width="600" alt="description">
+</p>
+
+### Parallel
+#### Rows
+<p align="center">
+<img src="plot_imgs/output_plot_rows.png" width="600" alt="description">
+</p>
+
+### Columns
+<p align="center">
+<img src="plot_imgs/output_plot_columns.png" width="600" alt="description">
+</p>
+
+### Pixel by pixel
+<p align="center">
+<img src="plot_imgs/output_plot_pixel_by_pixel.png" width="600" alt="description">
+</p>
+
+### Blocks
+<p align="center">
+<img src="plot_imgs/output_plot_block.png" width="600" alt="description">
 </p>

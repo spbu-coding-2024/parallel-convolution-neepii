@@ -2,7 +2,9 @@
 #include <stdlib.h>
 
 void free_main_args(struct main_args *margs) {
-  if (margs == NULL) return;
+  if (margs == NULL) {
+    return;
+  }
   free(margs->filter_name);
   free(margs->output_name);
   free(margs->input_name);
