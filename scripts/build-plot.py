@@ -27,16 +27,24 @@ def collect_data() -> array[float]:
     for i in range(sample_len):
         result = subprocess.run(cmd, capture_output=True, timeout=40, text=True)
 
-        if result.returncode == 0:
-            time_str = result.stdout.strip()
-            elapsed = float(time_str)
-            sample[i] = elapsed
-            # print(f"{img_file:20} {pixels:8} pixels  {elapsed:.6f} sec")
-        else:
-            print(f"{img_file:20} ERROR: {result.stderr}")
+        try:
+            if result.returncode == 0:
+                time_str = result.stdout.strip()
+                elapsed = float(time_str)
+                sample[i] = elapsed
+                # print(f"{img_file:20} {pixels:8} pixels  {elapsed:.6f} sec")
+            else:
+                print(f"{img_file:20} ERROR: {result.stderr}")
+        except Exception as e:
+            print(f"Warning: {e}")
+            print("Are you sure you built project with `make benchmark`?")
+            exit(1)
+            continue
     return sample
 
 filter_names = ["ident", "prewitt", "blur3", "blur5", "ridge", "sharp"]
+colors = ["red", "orange", "blue", "green", "black", "olive"]
+assert len(colors) == len(filter_names)
 
 if not os.path.exists("./build/conv"):
     print("Error: ./build/conv not found. Run 'make benchmark' first.")
@@ -74,7 +82,7 @@ for i in range(len(filter_names)):
     for j in range(len(imgs)):
         img_file = imgs[j]
         output_file = f"/tmp/{img_file}.out"
-        cmd = ["./build/conv", "-s", "-i", img_path[j], "-o", output_file, "-f", filter_names[i]]
+        cmd = ["./build/conv", "-i", img_path[j], "-o", output_file, "-f", filter_names[i]]
         sample = collect_data()
         # print(filter_names[i])
         # print(img_file)
@@ -90,13 +98,10 @@ if pixel_counts and execution_times:
     plt.tight_layout()
 
     for j in range(len(filter_names)):
-        r = np.round(np.random.rand(),1)
-        g = np.round(np.random.rand(),1)
-        b = np.round(np.random.rand(),1)
         samples = list(map(lambda x : np.array(x), execution_times[j]))
         mean_results = list(map(lambda x : np.mean(x), samples))
         std_results = list(map(lambda x : 3 * np.std(x, ddof=1) / np.sqrt(sample_len), samples))
-        plt.errorbar(pixel_counts, mean_results, yerr=std_results, marker='o', linestyle='--', color=[r,g,b], linewidth=2)
+        plt.errorbar(pixel_counts, mean_results, yerr=std_results, marker='o', linestyle='--', color=colors[j], linewidth=2)
 
     output_plot = "output_plot"
     plt.legend(filter_names)
