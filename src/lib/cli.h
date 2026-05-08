@@ -14,6 +14,7 @@ struct main_args {
   char *input_name;
   uint8_t mode_option;
   uint8_t filter_option;
+  bool use_pipeline;
 };
 
 enum {

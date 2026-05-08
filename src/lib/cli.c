@@ -11,7 +11,7 @@ struct option_pair_s {
   uint8_t value;
 };
 
-void usage(void) {
+static void usage(void) {
   puts("Usage: %s [OPTION...] -i INPUT -o OUTPUT\n"
        "Apply image filters to BMP files.\n"
        "\n"
@@ -19,6 +19,7 @@ void usage(void) {
        "  -o FILE     output image file\n"
        "  -f FILTER   apply filter (see below)\n"
        "  -m MODE     use compute mode (see below)\n"
+       "  -r          don't use pipeline\n"
        "  -h          display this help and exit\n"
        "\n"
        "Available filters:\n"
@@ -34,9 +35,8 @@ void usage(void) {
        "  block       compute parallely by blocks\n"
        "  pixel       compute parallely pixel by pixel\n"
        "\n"
-       "Example:\n"
-       "  %s -i photo.bmp -o blurred.bmp -f blur3\n"
-       "\n");
+       "EXAMPLE:\n"
+       "  %s -i photo.bmp -o blurred.bmp -f blur3");
 }
 void free_main_args(struct main_args *margs) {
   if (margs == NULL) {
@@ -80,11 +80,14 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
   int opt;
   int8_t return_code = ERROR_OPTION;
 
-  while ((opt = getopt(argc, argv, "m:hi:o:f:")) != -1) {
+  while ((opt = getopt(argc, argv, "rm:hi:o:f:")) != -1) {
     switch (opt) {
     case 'h':
       usage();
       return false;
+    case 'r':
+      margs->use_pipeline = false;
+      break;
     case 'i':
       margs->input_name = strdup(optarg);
       if (!margs->input_name) {

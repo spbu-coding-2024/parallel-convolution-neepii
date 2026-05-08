@@ -1,15 +1,10 @@
 #ifndef TASK_TASK_H
 #define TASK_TASK_H
 
+#include "common.h"
 #include <pthread.h>
 #include <stddef.h>
 #include <stdint.h>
-
-typedef enum {
-  READER,
-  COMPUTE,
-  WRITE,
-} task_type_t;
 
 typedef void (*task_func_t)(void *);
 
