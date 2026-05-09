@@ -17,12 +17,11 @@ struct work_s {
 };
 
 struct tpool_s {
-  pthread_t next_tid;
-
   pthread_t monitor_tid;
 
   size_t thread_count;
   size_t work_count;
+  atomic_int active_work_count;
   bool stop;
 
   struct work_s *workers;
@@ -34,9 +33,13 @@ struct tpool_s {
 
   struct task_queue_s *queue[NUM_OF_TASK_TYPES];
 };
+
+void tpool_wait(struct tpool_s *tpool);
+
 int64_t t_process_count(void);
 struct tpool_s *tpool_init(size_t thread_count);
 void *monitor_loop(void *tpool_ptr);
 void tpool_destroy(struct tpool_s *tpool);
-
+void task_queue_add_task(struct tpool_s *pool, task_type_t type,
+                         task_func_t func, void *args);
 #endif

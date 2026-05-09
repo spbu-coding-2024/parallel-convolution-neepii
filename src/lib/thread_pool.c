@@ -1,6 +1,7 @@
 #include "thread_pool.h"
 #include "common.h"
 #include <stdatomic.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -8,10 +9,16 @@
 
 int64_t t_process_count(void) { return sysconf(_SC_NPROCESSORS_ONLN); }
 
-static void *thread_work_loop(void *tpool_ptr) {
-  struct tpool_s *pool = (struct tpool_s *)tpool_ptr;
+struct work_loop_args_s {
+  struct tpool_s *tpool;
+  pthread_t tid;
+};
 
-  pthread_t tid = pool->next_tid;
+static void *thread_work_loop(void *args) {
+  struct work_loop_args_s *work_loop_args = (struct work_loop_args_s *)args;
+  struct tpool_s *pool = work_loop_args->tpool;
+  pthread_t tid = work_loop_args->tid;
+  free(args);
 
   while (!pool->stop) {
     struct task_s *task;
@@ -38,11 +45,16 @@ static void *thread_work_loop(void *tpool_ptr) {
       continue;
     }
     atomic_store(&pool->workers[tid].state, BUSY);
+    atomic_fetch_add(&pool->active_work_count, 1);
     task->func(task->args);
     atomic_store(&pool->workers[tid].state, IDLE);
+    atomic_fetch_add(&pool->active_work_count, -1);
     free(task);
-  }
 
+    pthread_mutex_lock(&pool->mutex);
+    pthread_cond_signal(&pool->is_finished);
+    pthread_mutex_unlock(&pool->mutex);
+  }
   return NULL;
 }
 
@@ -102,13 +114,9 @@ void *monitor_loop(void *tpool_ptr) {
 
     pthread_cond_broadcast(&pool->work_available);
   }
-  tpool_destroy(pool);
   return NULL;
 }
 
-/**
- * @param thread_count Number of threads in threadpool excluding monitor thread
- */
 struct tpool_s *tpool_init(size_t thread_count) {
   pthread_t thread;
   struct tpool_s *pool = malloc(sizeof(struct tpool_s));
@@ -118,6 +126,7 @@ struct tpool_s *tpool_init(size_t thread_count) {
 
   pool->thread_count = thread_count;
   pool->work_count = thread_count;
+  pool->active_work_count = 0;
   pool->stop = false;
 
   pthread_mutex_init(&pool->mutex, NULL);
@@ -126,45 +135,53 @@ struct tpool_s *tpool_init(size_t thread_count) {
   pthread_cond_init(&pool->work_available, NULL);
 
   for (int i = 0; i < 3; ++i) {
-    pool->queue[i] = task_queue_init(thread_count);
+    pool->queue[i] = task_queue_init(32);
+    if (pool->queue[i] == NULL) {
+      for (int j = i - 1; j >= 0; --j) {
+        task_queue_free(pool->queue[i]);
+      }
+      free(pool);
+      return NULL;
+    }
   }
 
   pool->workers = malloc(thread_count * sizeof(struct work_s));
   if (pool->workers == NULL) {
+    for (int i = 0; i < 3; ++i) {
+      task_queue_free(pool->queue[i]);
+    }
     free(pool);
     return NULL;
   }
 
   for (size_t i = 0; i < thread_count; i++) {
-    pool->next_tid = i;
-    pthread_create(&thread, NULL, &thread_work_loop, (void *)pool);
-    atomic_store(&pool->workers[i].type,
-                 i < 2 ? 0
-                       : (i < thread_count - 2
-                              ? 1
-                              : 2)); // TODO: replace ugly ternary operators
-    pthread_detach(thread);
+    struct work_loop_args_s *args = malloc(sizeof(struct work_loop_args_s));
+    args->tpool = pool;
+    args->tid = i;
+    uint8_t type = i < 2 ? 0 : (i < thread_count - 2 ? 1 : 2);
+    atomic_store(&pool->workers[i].state, IDLE);
+    atomic_store(&pool->workers[i].type, type);
+    pthread_create(&thread, NULL, &thread_work_loop, (void *)args);
   }
   pthread_create(&pool->monitor_tid, NULL, &monitor_loop, (void *)pool);
   return pool;
 }
 
-static void tpool_wait(struct tpool_s *tpool) {
+void tpool_wait(struct tpool_s *tpool) {
   pthread_mutex_lock(&tpool->mutex);
 
-  while (tpool->thread_count > 0)
+  while (tpool->active_work_count > 0 || tpool->queue[READER]->count ||
+         tpool->queue[COMPUTER]->count || tpool->queue[WRITER]->count) {
     pthread_cond_wait(&tpool->is_finished, &tpool->mutex);
+  }
 
   pthread_mutex_unlock(&tpool->mutex);
 }
-
 void tpool_destroy(struct tpool_s *tpool) {
   pthread_mutex_lock(&tpool->mutex);
-  tpool->stop = 1;
-
-  free(tpool->workers);
+  tpool->stop = true;
   tpool->work_count = 0;
-
+  tpool->active_work_count = 0;
   pthread_cond_broadcast(&tpool->is_in_progress);
   pthread_mutex_unlock(&tpool->mutex);
   tpool_wait(tpool);
@@ -172,6 +189,13 @@ void tpool_destroy(struct tpool_s *tpool) {
   pthread_mutex_destroy(&tpool->mutex);
   pthread_cond_destroy(&tpool->is_in_progress);
   pthread_cond_destroy(&tpool->is_finished);
-
+  free(tpool->workers);
   free(tpool);
+}
+
+void task_queue_add_task(struct tpool_s *pool, task_type_t type,
+                         task_func_t func, void *args) {
+  struct task_s *task = task_init(type, func, args);
+  task_queue_push(pool->queue[type], task);
+  pthread_cond_signal(&pool->work_available);
 }
