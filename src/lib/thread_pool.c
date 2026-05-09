@@ -7,7 +7,7 @@
 
 #define SLEEP_TIME_MONITOR_LOOP 1
 
-int64_t t_process_count(void) { return sysconf(_SC_NPROCESSORS_ONLN); }
+int64_t thread_process_count(void) { return sysconf(_SC_NPROCESSORS_ONLN); }
 
 struct work_loop_args_s {
   struct tpool_s *tpool;
@@ -26,13 +26,13 @@ static void *thread_work_loop(void *args) {
 
     switch (type) {
     case READER:
-      task = task_queue_try_pop(pool->queue[READER]);
+      task = task_queue_pop(pool->queue[READER]);
       break;
     case COMPUTER:
-      task = task_queue_try_pop(pool->queue[COMPUTER]);
+      task = task_queue_pop(pool->queue[COMPUTER]);
       break;
     case WRITER:
-      task = task_queue_try_pop(pool->queue[WRITER]);
+      task = task_queue_pop(pool->queue[WRITER]);
       break;
     default:
       return NULL;
@@ -74,7 +74,7 @@ void *monitor_loop(void *tpool_ptr) {
   struct tpool_s *pool = tpool_ptr;
 
   while (!pool->stop) {
-    sleep(SLEEP_TIME_MONITOR_LOOP);
+    /* sleep(SLEEP_TIME_MONITOR_LOOP); */
 
     size_t read_q = pool->queue[READER]->count;
     size_t compute_q = pool->queue[COMPUTER]->count;
@@ -134,7 +134,7 @@ struct tpool_s *tpool_init(size_t thread_count) {
   pthread_cond_init(&pool->is_in_progress, NULL);
   pthread_cond_init(&pool->work_available, NULL);
 
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < NUM_OF_TASK_TYPES; ++i) {
     pool->queue[i] = task_queue_init(32);
     if (pool->queue[i] == NULL) {
       for (int j = i - 1; j >= 0; --j) {
@@ -147,7 +147,7 @@ struct tpool_s *tpool_init(size_t thread_count) {
 
   pool->workers = malloc(thread_count * sizeof(struct work_s));
   if (pool->workers == NULL) {
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < NUM_OF_TASK_TYPES; ++i) {
       task_queue_free(pool->queue[i]);
     }
     free(pool);

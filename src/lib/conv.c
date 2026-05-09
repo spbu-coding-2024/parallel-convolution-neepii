@@ -17,25 +17,15 @@
 #define CHANNELS_COUNT 3
 #define TILE_SIZE 16
 
-typedef KernelMatrix *(*KernelInit)(void);
-
-struct pixel_s {
-  uint8_t r;
-  uint8_t g;
-  uint8_t b;
-  uint8_t a;
-};
-
-static inline int64_t multiply_by_rational_and_ceil(long num, long numer,
-                                                    long denom) {
-  long product = num * numer;
-  long remainder = product % denom;
-  long quotient = product / denom;
+int64_t multiply_by_rational_and_ceil(long num, long numer, long denom) {
+  const long product = num * numer;
+  const long remainder = product % denom;
+  const long quotient = product / denom;
 
   return quotient + (remainder > 0 ? 1 : 0);
 }
 
-static inline uint8_t to_byte(int64_t value) {
+uint8_t to_byte(int64_t value) {
   if (value < 0) {
     return 0;
   }
@@ -45,7 +35,7 @@ static inline uint8_t to_byte(int64_t value) {
   return value;
 }
 
-static inline int32_t apply_mirror_padding(int32_t cord, size_t max_value) {
+int32_t apply_mirror_padding(int32_t cord, size_t max_value) {
   if (max_value == 1) {
     return 0;
   }
@@ -60,10 +50,9 @@ static inline int32_t apply_mirror_padding(int32_t cord, size_t max_value) {
   return period - mod;
 }
 
-static void convolute_pixel_sequentialy(BMP *image, int32_t x_cord,
-                                        int32_t y_cord,
-                                        const KernelMatrix *kernel,
-                                        struct pixel_s *pixel_arr) {
+void convolute_pixel_sequentialy(BMP *image, int32_t x_cord, int32_t y_cord,
+                                 const KernelMatrix *kernel,
+                                 struct pixel_s *pixel_arr) {
   int64_t red = 0;
   int64_t green = 0;
   int64_t blue = 0;

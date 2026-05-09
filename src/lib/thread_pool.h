@@ -36,7 +36,7 @@ struct tpool_s {
 
 void tpool_wait(struct tpool_s *tpool);
 
-int64_t t_process_count(void);
+int64_t thread_process_count(void);
 struct tpool_s *tpool_init(size_t thread_count);
 void *monitor_loop(void *tpool_ptr);
 void tpool_destroy(struct tpool_s *tpool);

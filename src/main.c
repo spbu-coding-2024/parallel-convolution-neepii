@@ -1,7 +1,7 @@
 #include "cbmp.h"
 #include "cli.h"
 #include "conv.h"
-#include "thread_pool.h"
+#include "conv_pipeline.h"
 
 #include <getopt.h>
 #include <stdbool.h>
@@ -28,15 +28,8 @@ int main(int argc, char *argv[]) {
   }
 
   if (args.use_pipeline) {
-    size_t thread_count = t_process_count();
-    if (thread_count == 1) {
-      fputs("Thread count equals to one\n", stderr);
-      free_main_args(&args);
-      return EXITFAILURE;
-    }
-    struct tpool_s *pool = tpool_init(thread_count);
-    if (!pool) {
-      fputs("Cannot create thread pool\n", stderr);
+    if (!apply_filter_pipeline(image, args)) {
+      fputs("Cannot apply filter\n", stderr);
       free_main_args(&args);
       return EXITFAILURE;
     }

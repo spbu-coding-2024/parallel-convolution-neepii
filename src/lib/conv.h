@@ -14,12 +14,29 @@
 #define CACHE_LINE_SIZE 8
 #endif
 
+struct pixel_s {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t a;
+};
+
 typedef struct {
   int32_t *mtx[LAYER_COUNT];
   int32_t denominator_coef;
   size_t size;
 } KernelMatrix;
 
+typedef KernelMatrix *(*KernelInit)(void);
+
+uint8_t to_byte(int64_t value);
+
+int64_t multiply_by_rational_and_ceil(long num, long numer, long denom);
+int32_t apply_mirror_padding(int32_t cord, size_t max_value);
+
+void convolute_pixel_sequentialy(BMP *image, int32_t x_cord, int32_t y_cord,
+                                 const KernelMatrix *kernel,
+                                 struct pixel_s *pixel_arr);
 void conv_apply_kernel_sequentialy(BMP *image, const KernelMatrix *kernel);
 void conv_apply_kernel_parallelly_rows(BMP *image, const KernelMatrix *kernel);
 void conv_apply_kernel_parallelly_columns(BMP *image,
