@@ -1,5 +1,5 @@
 #include "conv.h"
-#include "cbmp.h"
+#include "cbmp/cbmp.h"
 #include "cli.h"
 #include "matrix.h"
 #include <limits.h>

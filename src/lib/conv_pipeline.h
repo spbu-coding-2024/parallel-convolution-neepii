@@ -2,8 +2,6 @@
 #define CONVPIPELINE_CONVPIPELINE_H
 #include "cli.h"
 #include "conv.h"
-#include "stb_image.h"
-#include "stb_image_write.h"
 #include "thread_pool.h"
 
 #include <stdint.h>

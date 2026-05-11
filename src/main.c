@@ -1,4 +1,4 @@
-#include "cbmp.h"
+#include "cbmp/cbmp.h"
 #include "cli.h"
 #include "conv.h"
 #include "conv_pipeline.h"

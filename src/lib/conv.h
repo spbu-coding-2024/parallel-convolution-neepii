@@ -1,7 +1,7 @@
 #ifndef CONV_CONV_H
 #define CONV_CONV_H
 
-#include "cbmp.h"
+#include "cbmp/cbmp.h"
 #include "cli.h"
 #include <stddef.h>
 #include <stdint.h>
