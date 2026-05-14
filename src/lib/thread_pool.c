@@ -158,7 +158,7 @@ struct tpool_s *tpool_init(size_t thread_count) {
     struct work_loop_args_s *args = malloc(sizeof(struct work_loop_args_s));
     args->tpool = pool;
     args->tid = i;
-    uint8_t type = i < 4 ? 1 : 2;
+    uint8_t type = i < 2 ? READER : (i < thread_count - 2 ? COMPUTER : WRITER);
     atomic_store(&pool->workers[i].state, IDLE);
     atomic_store(&pool->workers[i].type, type);
     pthread_create(&thread, NULL, &thread_work_loop, (void *)args);

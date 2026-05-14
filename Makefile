@@ -1,9 +1,9 @@
 .PHONY: all test debug bear clean benchmark
 
 CC:=gcc
-CFLAGS:= -Werror -Wall -Wextra -Wpedantic -Wshadow -O3 -fopenmp -march=native -Isrc/external
-TEST_FLAGS:= -Isrc/lib
-MAIN_FLAGS:= -Isrc/lib
+CFLAGS:= -Werror -Wall -Wextra -Wpedantic -Wshadow -O3 -fopenmp -march=native -Isrc/external -lm
+TEST_FLAGS:= -Isrc/lib -lm
+MAIN_FLAGS:= -Isrc/lib -lm
 EXTERN_FLAGS = -Wall -Wextra -Wpedantic -Wno-sign-compare -Wno-unused-parameter -O3 -march=native -fno-exceptions -Wno-incompatible-pointer-types 
 TEST_LDFLAGS:= -lcmocka
 

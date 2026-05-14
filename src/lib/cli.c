@@ -12,10 +12,9 @@ struct option_pair_s {
 };
 
 static void usage(void) {
-  puts("Usage: %s [OPTION...] -i INPUT -o OUTPUT\n"
+  puts("Usage: %s [OPTION...] -o OUTPUT [INPUT FILES...]\n"
        "Apply image filters to BMP files.\n"
        "\n"
-       "  -i FILE     input image file (e.g., input.bmp)\n"
        "  -o FILE     output image file\n"
        "  -f FILTER   apply filter (see below)\n"
        "  -m MODE     use compute mode (see below)\n"
@@ -36,14 +35,17 @@ static void usage(void) {
        "  pixel       compute parallely pixel by pixel\n"
        "\n"
        "EXAMPLE:\n"
-       "  %s -i photo.bmp -o blurred.bmp -f blur3");
+       "  %s -o blurred.bmp -f blur3 photo.bmp");
 }
 void free_main_args(struct main_args *margs) {
   if (margs == NULL) {
     return;
   }
   free(margs->output_name);
-  free(margs->input_name);
+  for (size_t i = 0; i < margs->num_of_inputs; ++i) {
+    free(margs->arr_input[i]);
+  }
+  free(margs->arr_input);
 }
 
 static const struct option_pair_s filter_arr[] = {
@@ -76,28 +78,34 @@ static int8_t get_enum_from_option(const char *name,
   return ERROR_OPTION;
 }
 
+void from_input_to_output(char *input, size_t output_len, char *buffer) {
+  strncpy(buffer, input, output_len);
+  buffer[output_len] = 'o';
+  buffer[output_len + 1] = '\0';
+}
+
 bool get_args(int argc, char *argv[], struct main_args *margs) {
   int opt;
   int8_t return_code = ERROR_OPTION;
 
-  while ((opt = getopt(argc, argv, "rm:hi:o:f:")) != -1) {
+  margs->arr_input = malloc(sizeof(char *) * argc);
+  if (!margs->arr_input) {
+    return false;
+  }
+
+  while ((opt = getopt(argc, argv, "rm:ho:f:")) != -1) {
     switch (opt) {
     case 'h':
       usage();
-      return false;
+      goto args_free;
     case 'r':
       margs->use_pipeline = false;
-      break;
-    case 'i':
-      margs->input_name = strdup(optarg);
-      if (!margs->input_name) {
-        return false;
-      }
       break;
     case 'o':
       margs->output_name = strdup(optarg);
       if (!margs->output_name) {
-        return false;
+        fputs("Can't allocate memory for output name\n", stderr);
+        goto args_free;
       }
       break;
     case 'm':
@@ -113,7 +121,7 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
           optarg, filter_arr, sizeof(filter_arr) / sizeof(filter_arr[0]));
       if (return_code == ERROR_OPTION) {
         fputs("No such filter\n", stderr);
-        return false;
+        goto args_free;
       }
       margs->filter_option = return_code;
       break;
@@ -122,12 +130,25 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
     }
   }
 
-  if (!margs->input_name || !margs->output_name) {
+  for (int i = optind; i < argc; ++i) {
+    margs->arr_input[margs->num_of_inputs] = strdup(argv[i]);
+    if (!margs->arr_input[margs->num_of_inputs]) {
+      return false;
+    }
+    margs->num_of_inputs++;
+  }
+  if (margs->num_of_inputs == 0 || !margs->output_name) {
     usage();
-    free(margs->output_name);
-    free(margs->input_name);
-    return false;
+    goto args_free;
   }
 
   return true;
+
+args_free:
+  free(margs->output_name);
+  for (size_t i = 0; i < margs->num_of_inputs; ++i) {
+    free(margs->arr_input[i]);
+  }
+  free(margs->arr_input);
+  return false;
 }

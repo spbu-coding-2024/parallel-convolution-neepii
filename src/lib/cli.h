@@ -2,6 +2,7 @@
 #define CLI_CLI_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 enum exit_status {
@@ -11,7 +12,8 @@ enum exit_status {
 
 struct main_args {
   char *output_name;
-  char *input_name;
+  char **arr_input;
+  size_t num_of_inputs;
   uint8_t mode_option;
   uint8_t filter_option;
   bool use_pipeline;
@@ -34,6 +36,7 @@ enum {
   BLOCK,
 };
 
+void from_input_to_output(char *input, size_t output_len, char *buffer);
 bool get_args(int argc, char *argv[], struct main_args *margs);
 void free_main_args(struct main_args *margs);
 

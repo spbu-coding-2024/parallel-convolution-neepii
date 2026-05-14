@@ -5,20 +5,28 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-struct task_args {
+struct reader_args {
   struct tpool_s *pool;
+  struct main_args *args;
+  BMP **results;
+  KernelMatrix *kernel;
+  size_t num;
+};
+struct computer_args {
+  struct tpool_s *pool;
+  BMP *result;
   BMP *input_image;
-  BMP *output_image;
   struct pixel_s *pixels;
   KernelMatrix *kernel;
   size_t cord;
 };
 
 static void task_writer_columns(void *args) {
-  const struct task_args *task_args = (struct task_args *)args;
+  struct computer_args *task_args = (struct computer_args *)args;
 
-  BMP *output_image = task_args->output_image;
+  BMP *output_image = task_args->result;
   const struct pixel_s *pixels = task_args->pixels;
 
   const size_t xcord = task_args->cord;
@@ -30,9 +38,10 @@ static void task_writer_columns(void *args) {
     const struct pixel_s cell = pixels[(ycord * width) + xcord];
     set_pixel_rgb(output_image, xcord, ycord, cell.r, cell.g, cell.b);
   }
+  free(task_args);
 }
 static void task_computer_columns(void *args) {
-  const struct task_args *task_args = (struct task_args *)args;
+  const struct computer_args *task_args = (struct computer_args *)args;
 
   BMP *image = task_args->input_image;
   struct pixel_s *output_pixels = task_args->pixels;
@@ -48,88 +57,93 @@ static void task_computer_columns(void *args) {
   task_queue_add_task(pool, WRITER, task_writer_columns, args);
 }
 
-/* static void task_reader_columns(void *args) { */
-/*   struct task_args *task_args = (struct task_args *)args; */
+static void task_reader_columns(void *args) {
+  struct reader_args *task_args = (struct reader_args *)args;
+  const size_t num = task_args->num;
 
-/*   BMP *input_image = task_args->input_image; */
-/*   struct tpool_s *pool = task_args->pool; */
+  BMP *input_image = bopen(task_args->args->arr_input[num]);
+  BMP *result_image = b_deep_copy(input_image);
+  task_args->results[num] = result_image;
 
-/*   const size_t height = get_height(input_image); */
-
-/*   for (size_t ycord = 0; ycord < height; ++ycord) { */
-/*     uint8_t red; */
-/*     uint8_t green; */
-/*     uint8_t blue; */
-/*     get_pixel_rgb(image, xcord, ycord, &red, &green, &blue); */
-/*     input_pixels[(ycord * width) + xcord].r = red; */
-/*     input_pixels[(ycord * width) + xcord].g = green; */
-/*     input_pixels[(ycord * width) + xcord].b = blue; */
-/*   } */
-/*   task_queue_add_task(pool, COMPUTER, task_computer_columns, args); */
-/* } */
-
-int32_t apply_filter_pipeline_columns(BMP *image, KernelMatrix *kernel,
-                                      struct tpool_s *pool) {
-  uint8_t exit_code = true;
-  BMP *output_image = b_deep_copy(image);
-  if (!output_image) {
-    return false;
-  }
-
-  const size_t height = get_height(image);
-  const size_t width = get_width(image);
+  const size_t width = get_width(input_image);
+  const size_t height = get_height(input_image);
   struct pixel_s *pixels = malloc(height * width * sizeof(struct pixel_s));
-  if (pixels == NULL) {
-    exit_code = false;
-    goto pixels_free;
-  }
-  struct task_args *task_args = malloc(width * sizeof(struct task_args));
-  if (task_args == NULL) {
-    exit_code = false;
-    goto task_free;
+  if (!pixels) {
+    flockfile(stderr);
+    fputs("Error in thread: ", stderr);
+    fputs("Can allocate memory", stderr);
+    fputc('\n', stderr);
+    funlockfile(stderr);
+    free(task_args);
+    return;
   }
 
-  for (size_t i = 0; i < width; i++) {
+  for (size_t i = 0; i < width; ++i) {
+    struct computer_args *cargs = malloc(sizeof(struct computer_args));
+    cargs->pool = task_args->pool;
+    cargs->input_image = input_image;
+    cargs->result = result_image;
+    cargs->pixels = pixels;
+    cargs->kernel = task_args->kernel;
+    cargs->cord = i;
+    /* struct tpool_s *pool; */
+    /* BMP *input_image; */
+    /* BMP *output_image; */
+    /* struct pixel_s *pixels; */
+    /* KernelMatrix *kernel; */
+    /* size_t cord */;
+    task_queue_add_task(task_args->pool, COMPUTER, task_computer_columns,
+                        cargs);
+  }
+}
+
+BMP **apply_filter_pipeline_columns(struct main_args *args,
+                                    KernelMatrix *kernel,
+                                    struct tpool_s *pool) {
+  struct reader_args *task_args =
+      malloc(args->num_of_inputs * sizeof(struct reader_args));
+  if (task_args == NULL) {
+    return NULL;
+  }
+  BMP **results = malloc(sizeof(args->num_of_inputs * sizeof(BMP *)));
+  if (!results) {
+    free(task_args);
+    return NULL;
+  }
+
+  for (size_t i = 0; i < args->num_of_inputs; i++) {
     task_args[i].pool = pool;
     task_args[i].kernel = kernel;
-    task_args[i].input_image = image;
-    task_args[i].output_image = output_image;
-    task_args[i].pixels = pixels;
-    task_args[i].cord = i;
+    task_args[i].results = results;
+    task_args[i].args = args;
+    task_args[i].num = i;
   }
 
-  for (size_t xcord = 0; xcord < width; xcord++) {
-    task_queue_add_task(pool, COMPUTER, task_computer_columns,
-                        &task_args[xcord]);
+  for (size_t i = 0; i < args->num_of_inputs; i++) {
+    task_queue_add_task(pool, READER, task_reader_columns, &task_args[i]);
   }
   tpool_wait(pool);
-  *image = *output_image;
-
-  free(output_image);
-task_free:
   free(task_args);
-pixels_free:
-  free(pixels);
-  return exit_code;
+  return results;
 }
-int32_t apply_filter_pipeline(BMP *image, struct main_args args) {
+int32_t apply_filter_pipeline(struct main_args *args) {
   size_t thread_count = thread_process_count();
   struct tpool_s *pool = tpool_init(thread_count);
   if (!pool) {
     fputs("Cannot create thread pool\n", stderr);
     return false;
   }
-  KernelMatrix *kernel = choose_kernel_matrix(args.filter_option);
+  KernelMatrix *kernel = choose_kernel_matrix(args->filter_option);
   if (kernel == NULL) {
     tpool_destroy(pool);
     fputs("No such kernel", stderr);
     return false;
   }
-
-  switch (args.mode_option) {
+  BMP **results = NULL;
+  switch (args->mode_option) {
   case SEQUENTIALLY:
   case COLUMNS:
-    apply_filter_pipeline_columns(image, kernel, pool);
+    results = apply_filter_pipeline_columns(args, kernel, pool);
     break;
   case ROWS:
     fputs("UNIMPL\n", stderr);
@@ -142,8 +156,18 @@ int32_t apply_filter_pipeline(BMP *image, struct main_args args) {
     break;
   }
 
-  tpool_destroy(pool);
+  if (results) {
+    for (size_t i = 0; i < args->num_of_inputs; i++) {
+      const size_t output_len = strlen(args->arr_input[i]);
+      char buffer[output_len + 2];
+      from_input_to_output(args->arr_input[i], output_len, buffer);
+      bwrite(results[i], buffer);
+      bclose(results[i]);
+    }
+    free(results);
+  }
 
+  tpool_destroy(pool);
   free_kernel_matrix(kernel);
   return true;
 }

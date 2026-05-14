@@ -81,19 +81,29 @@ static void test_template_openmp(char *image_path, const int8_t filter) {
 }
 
 static void test_template_pipeline(char *image_path, const int8_t filter) {
-  BMP *image_par = bopen(image_path);
   BMP *image_seq = bopen(image_path);
   KernelMatrix *ker = choose_kernel_matrix(filter);
   size_t thread_count = thread_process_count();
   struct tpool_s *pool = tpool_init(thread_count);
+  char *image_arr = {image_path};
+
+  struct main_args args = {
+      .output_name = NULL,
+      .arr_input = &image_arr,
+      .mode_option = COLUMNS,
+      .filter_option = filter,
+      .use_pipeline = true,
+      .num_of_inputs = 0,
+  };
 
   conv_apply_kernel_sequentialy(image_seq, ker);
-  apply_filter_pipeline_columns(image_par, ker, pool);
-
-  assert_int_equal(compare_images(image_par, image_seq), 0);
+  BMP **pipeline_results = apply_filter_pipeline_columns(&args, ker, pool);
+  for (size_t i = 0; i < args.num_of_inputs; ++i) {
+    assert_int_equal(compare_images(pipeline_results[i], image_seq), 0);
+    bclose(pipeline_results[i]);
+  }
 
   bclose(image_seq);
-  bclose(image_par);
   tpool_destroy(pool);
   free_kernel_matrix(ker);
 }

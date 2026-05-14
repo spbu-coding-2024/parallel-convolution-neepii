@@ -6,7 +6,7 @@
 
 #include <stdint.h>
 
-int32_t apply_filter_pipeline(BMP *image, struct main_args args);
-int32_t apply_filter_pipeline_columns(BMP *image, KernelMatrix *kernel,
-                                      struct tpool_s *pool);
+int32_t apply_filter_pipeline(struct main_args *args);
+BMP **apply_filter_pipeline_columns(struct main_args *args,
+                                    KernelMatrix *kernel, struct tpool_s *pool);
 #endif
