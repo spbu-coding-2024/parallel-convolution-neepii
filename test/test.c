@@ -13,10 +13,14 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define TEST_IMAGE_1_PATH "test/images/emacs.bmp"
 #define TEST_IMAGE_2_PATH "test/images/coolgame.bmp"
+#define TMP_IMAGE_PATH "/tmp/tmpimage.bmp"
+
+#define FUZZING_ITER_COUNT 2
 
 static int32_t compare_images(BMP *fst, BMP *snd) {
   const size_t fst_height = get_height(fst);
@@ -106,6 +110,39 @@ static void test_template_pipeline(char *image_path, const int8_t filter) {
   bclose(image_seq);
   tpool_destroy(pool);
   free_kernel_matrix(ker);
+}
+
+void generate_random_image(void) {
+  BMP *image = bopen(TEST_IMAGE_1_PATH);
+
+  const size_t width = get_width(image);
+  const size_t height = get_height(image);
+
+  srand(time(NULL));
+  for (size_t xcord = 0; xcord < width; ++xcord) {
+    for (size_t ycord = 0; ycord < height; ++ycord) {
+      uint8_t r = (uint8_t)rand();
+      uint8_t g = (uint8_t)rand();
+      uint8_t b = (uint8_t)rand();
+      set_pixel_rgb(image, xcord, ycord, r, g, b);
+    }
+  }
+
+  bwrite(image, TMP_IMAGE_PATH);
+}
+
+static void test_fuzzing_pipeline(const int8_t filter) {
+  for (int i = 0; i < FUZZING_ITER_COUNT; ++i) {
+    generate_random_image();
+    test_template_pipeline(TMP_IMAGE_PATH, filter);
+  }
+}
+
+static void test_fuzzing_openmp(const int8_t filter) {
+  for (int i = 0; i < FUZZING_ITER_COUNT; ++i) {
+    generate_random_image();
+    test_template_openmp(TMP_IMAGE_PATH, filter);
+  }
 }
 
 static void test_ridge1_openmp(void **state) {
@@ -208,6 +245,106 @@ static void test_identity2_pipeline(void **state) {
   test_template_pipeline(TEST_IMAGE_2_PATH, IDENT);
 }
 
+static void test_fuzzing_ridge1_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(RIDGE);
+}
+
+static void test_fuzzing_ridge2_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(RIDGE);
+}
+
+static void test_fuzzing_3x3_gauss1_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(BLUR3);
+}
+
+static void test_fuzzing_3x3_gauss2_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(BLUR3);
+}
+
+static void test_fuzzing_5x5_gauss1_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(BLUR5);
+}
+
+static void test_fuzzing_5x5_gauss2_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(BLUR5);
+}
+
+static void test_fuzzing_sharp1_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(SHARP);
+}
+
+static void test_fuzzing_sharp2_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(SHARP);
+}
+
+static void test_fuzzing_identity1_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(IDENT);
+}
+
+static void test_fuzzing_identity2_openmp(void **state) {
+  (void)state;
+  test_fuzzing_openmp(IDENT);
+}
+
+static void test_fuzzing_ridge1_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(RIDGE);
+}
+
+static void test_fuzzing_ridge2_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(RIDGE);
+}
+
+static void test_fuzzing_3x3_gauss1_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(BLUR3);
+}
+
+static void test_fuzzing_3x3_gauss2_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(BLUR3);
+}
+
+static void test_fuzzing_5x5_gauss1_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(BLUR5);
+}
+
+static void test_fuzzing_5x5_gauss2_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(BLUR5);
+}
+
+static void test_fuzzing_sharp1_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(SHARP);
+}
+
+static void test_fuzzing_sharp2_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(SHARP);
+}
+
+static void test_fuzzing_identity1_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(IDENT);
+}
+
+static void test_fuzzing_identity2_pipeline(void **state) {
+  (void)state;
+  test_fuzzing_pipeline(IDENT);
+}
+
 int main(void) {
 
   const struct CMUnitTest tests[] = {
@@ -232,6 +369,26 @@ int main(void) {
     cmocka_unit_test(test_ridge2_pipeline),
     cmocka_unit_test(test_sharp1_pipeline),
     cmocka_unit_test(test_sharp2_pipeline),
+    cmocka_unit_test(test_fuzzing_3x3_gauss1_openmp),
+    cmocka_unit_test(test_fuzzing_3x3_gauss2_openmp),
+    cmocka_unit_test(test_fuzzing_5x5_gauss1_openmp),
+    cmocka_unit_test(test_fuzzing_5x5_gauss2_openmp),
+    cmocka_unit_test(test_fuzzing_identity1_openmp),
+    cmocka_unit_test(test_fuzzing_identity2_openmp),
+    cmocka_unit_test(test_fuzzing_ridge1_openmp),
+    cmocka_unit_test(test_fuzzing_ridge2_openmp),
+    cmocka_unit_test(test_fuzzing_sharp1_openmp),
+    cmocka_unit_test(test_fuzzing_sharp2_openmp),
+    cmocka_unit_test(test_fuzzing_3x3_gauss1_pipeline),
+    cmocka_unit_test(test_fuzzing_3x3_gauss2_pipeline),
+    cmocka_unit_test(test_fuzzing_5x5_gauss1_pipeline),
+    cmocka_unit_test(test_fuzzing_5x5_gauss2_pipeline),
+    cmocka_unit_test(test_fuzzing_identity1_pipeline),
+    cmocka_unit_test(test_fuzzing_identity2_pipeline),
+    cmocka_unit_test(test_fuzzing_ridge1_pipeline),
+    cmocka_unit_test(test_fuzzing_ridge2_pipeline),
+    cmocka_unit_test(test_fuzzing_sharp1_pipeline),
+    cmocka_unit_test(test_fuzzing_sharp2_pipeline),
       // clang-format on
   };
 
