@@ -78,7 +78,8 @@ void *monitor_loop(void *tpool_ptr) {
   while (!pool->stop) {
     usleep(100000);
 
-    if (pool->stop) break;
+    if (pool->stop)
+      break;
 
     size_t read_q = task_queue_count(pool->queue[READER]);
     size_t compute_q = task_queue_count(pool->queue[COMPUTER]);
@@ -103,7 +104,8 @@ void *monitor_loop(void *tpool_ptr) {
       }
     }
 
-    if (pool->stop) break;
+    if (pool->stop)
+      break;
 
     if (compute_q > 10 && readers > 1) {
       move_thread_to_role(pool, READER, COMPUTER);
@@ -216,7 +218,8 @@ struct tpool_s *tpool_init(size_t thread_count) {
     }
     atomic_store(&pool->workers[i].state, IDLE);
     atomic_store(&pool->workers[i].type, type);
-    if (pthread_create(&pool->worker_tids[i], NULL, &thread_work_loop, (void *)args) != 0) {
+    if (pthread_create(&pool->worker_tids[i], NULL, &thread_work_loop,
+                       (void *)args) != 0) {
       free(args);
       for (size_t k = 0; k < i; ++k) {
         pthread_cancel(pool->worker_tids[k]);
@@ -234,7 +237,8 @@ struct tpool_s *tpool_init(size_t thread_count) {
       return NULL;
     }
   }
-  if (pthread_create(&pool->monitor_tid, NULL, &monitor_loop, (void *)pool) != 0) {
+  if (pthread_create(&pool->monitor_tid, NULL, &monitor_loop, (void *)pool) !=
+      0) {
     for (size_t i = 0; i < thread_count; ++i) {
       pthread_cancel(pool->worker_tids[i]);
     }
@@ -256,8 +260,9 @@ struct tpool_s *tpool_init(size_t thread_count) {
 void tpool_wait(struct tpool_s *tpool) {
   pthread_mutex_lock(&tpool->mutex);
 
-  while (tpool->active_work_count > 0 || task_queue_count(tpool->queue[READER]) > 0 ||
-         task_queue_count(tpool->queue[COMPUTER]) > 0 || 
+  while (tpool->active_work_count > 0 ||
+         task_queue_count(tpool->queue[READER]) > 0 ||
+         task_queue_count(tpool->queue[COMPUTER]) > 0 ||
          task_queue_count(tpool->queue[WRITER]) > 0) {
     pthread_cond_wait(&tpool->is_finished, &tpool->mutex);
   }
