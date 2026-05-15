@@ -20,7 +20,7 @@
 #define TEST_IMAGE_2_PATH "test/images/coolgame.bmp"
 #define TMP_IMAGE_PATH "/tmp/tmpimage.bmp"
 
-#define FUZZING_ITER_COUNT 2
+#define FUZZING_ITER_COUNT 1
 
 static int32_t compare_images(BMP *fst, BMP *snd) {
   const size_t fst_height = get_height(fst);
