@@ -27,8 +27,7 @@ CFLAGS: see Makefile for info
 <img src="plot_imgs/output_sequential_plot.png" width="600" alt="description">
 </p>
 
-<<<<<<< Updated upstream
-### Parallel
+### Parallel (OpenMP)
 
 #### Rows
 <p align="center">
@@ -48,4 +47,10 @@ CFLAGS: see Makefile for info
 #### Blocks
 <p align="center">
 <img src="plot_imgs/output_plot_block.png" width="600" alt="description">
+</p>
+
+### Parallel (Pipeline)
+Image used are in test/images directory
+<p align="center">
+<img src="plot_imgs/pipeline_plot.png" width="600" alt="description">
 </p>
