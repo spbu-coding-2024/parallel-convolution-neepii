@@ -92,7 +92,7 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
     return false;
   }
 
-  while ((opt = getopt(argc, argv, "rm:ho:f:")) != -1) {
+  while ((opt = getopt(argc, argv, "rm:hf:")) != -1) {
     switch (opt) {
     case 'h':
       usage();

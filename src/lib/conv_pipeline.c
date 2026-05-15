@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef BENCHMARK
+#include <time.h>
+#endif
+
 struct reader_args {
   struct tpool_s *pool;
   struct main_args *main_args;
@@ -138,6 +142,7 @@ static void task_reader_block(void *args) {
         (cargs->x + block_width > width) ? (width - cargs->x) : block_width;
     cargs->height =
         (cargs->y + block_height > height) ? (height - cargs->y) : block_height;
+
     task_queue_add_task(targs->pool, COMPUTER, task_computer_block, cargs);
   }
 }
@@ -171,6 +176,10 @@ BMP **start_pipeline_and_wait(struct main_args *args, KernelMatrix *kernel,
   return results;
 }
 int32_t apply_filter_pipeline(struct main_args *args) {
+  if (args->filter_option == PREWITT) {
+    fputs("To use Prewitt operator use `-r` flag\n", stderr);
+    return false;
+  }
   size_t thread_count = thread_process_count();
   struct tpool_s *pool = tpool_init(thread_count);
   if (!pool) {
@@ -178,12 +187,26 @@ int32_t apply_filter_pipeline(struct main_args *args) {
     return false;
   }
   KernelMatrix *kernel = choose_kernel_matrix(args->filter_option);
-  if (kernel == NULL) {
+  if (kernel == NULL && args->filter_option != PREWITT) {
     tpool_destroy(pool);
-    fputs("No such kernel", stderr);
+    fputs("No such kernel\n", stderr);
     return false;
   }
+
+#ifdef BENCHMARK
+  struct timespec start;
+  struct timespec end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+#endif
+
   BMP **results = start_pipeline_and_wait(args, kernel, pool);
+
+#ifdef BENCHMARK
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  double time_taken =
+      (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) * 1e-9;
+  printf("%f\n", time_taken);
+#endif
 
   if (results) {
     for (size_t i = 0; i < args->num_of_inputs; i++) {

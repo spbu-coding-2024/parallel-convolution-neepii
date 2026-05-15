@@ -369,7 +369,7 @@ static const KernelInit filter_arr[] = {
 };
 
 KernelMatrix *choose_kernel_matrix(const int8_t filter) {
-  return filter_arr[filter]();
+  return (filter == PREWITT) ? NULL : filter_arr[filter]();
 }
 
 void free_kernel_matrix(KernelMatrix *ker) {
