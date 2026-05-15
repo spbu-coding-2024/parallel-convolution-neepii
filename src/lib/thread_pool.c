@@ -26,13 +26,13 @@ static void *thread_work_loop(void *args) {
 
     switch (type) {
     case READER:
-      task = task_queue_pop(pool->queue[READER]);
+      task = task_queue_try_pop(pool->queue[READER]);
       break;
     case COMPUTER:
-      task = task_queue_pop(pool->queue[COMPUTER]);
+      task = task_queue_try_pop(pool->queue[COMPUTER]);
       break;
     case WRITER:
-      task = task_queue_pop(pool->queue[WRITER]);
+      task = task_queue_try_pop(pool->queue[WRITER]);
       break;
     default:
       return NULL;
@@ -40,7 +40,9 @@ static void *thread_work_loop(void *args) {
 
     if (!task) {
       pthread_mutex_lock(&pool->mutex);
-      pthread_cond_wait(&pool->work_available, &pool->mutex);
+      if (!pool->stop) {
+        pthread_cond_wait(&pool->work_available, &pool->mutex);
+      }
       pthread_mutex_unlock(&pool->mutex);
       continue;
     }
@@ -74,11 +76,13 @@ void *monitor_loop(void *tpool_ptr) {
   struct tpool_s *pool = tpool_ptr;
 
   while (!pool->stop) {
-    /* sleep(SLEEP_TIME_MONITOR_LOOP); */
+    usleep(100000);
 
-    size_t read_q = pool->queue[READER]->count;
-    size_t compute_q = pool->queue[COMPUTER]->count;
-    size_t write_q = pool->queue[WRITER]->count;
+    if (pool->stop) break;
+
+    size_t read_q = task_queue_count(pool->queue[READER]);
+    size_t compute_q = task_queue_count(pool->queue[COMPUTER]);
+    size_t write_q = task_queue_count(pool->queue[WRITER]);
 
     int32_t readers = 0;
     int32_t computers = 0;
@@ -99,7 +103,8 @@ void *monitor_loop(void *tpool_ptr) {
       }
     }
 
-    // Rebalancing decisions - never move the last thread of any type
+    if (pool->stop) break;
+
     if (compute_q > 10 && readers > 1) {
       move_thread_to_role(pool, READER, COMPUTER);
     }
@@ -112,7 +117,6 @@ void *monitor_loop(void *tpool_ptr) {
       move_thread_to_role(pool, READER, COMPUTER);
     }
 
-    // Rebalance back if a stage gets stuck with no threads
     if (readers == 0 && computers > 1) {
       move_thread_to_role(pool, COMPUTER, READER);
     }
@@ -137,7 +141,6 @@ void *monitor_loop(void *tpool_ptr) {
 }
 
 struct tpool_s *tpool_init(size_t thread_count) {
-  pthread_t thread;
   struct tpool_s *pool = malloc(sizeof(struct tpool_s));
   if (pool == NULL) {
     return NULL;
@@ -157,7 +160,7 @@ struct tpool_s *tpool_init(size_t thread_count) {
     pool->queue[i] = task_queue_init(32);
     if (pool->queue[i] == NULL) {
       for (int j = i - 1; j >= 0; --j) {
-        task_queue_free(pool->queue[i]);
+        task_queue_free(pool->queue[j]);
       }
       free(pool);
       return NULL;
@@ -173,11 +176,36 @@ struct tpool_s *tpool_init(size_t thread_count) {
     return NULL;
   }
 
+  pool->worker_tids = malloc(thread_count * sizeof(pthread_t));
+  if (pool->worker_tids == NULL) {
+    for (int i = 0; i < NUM_OF_TASK_TYPES; ++i) {
+      task_queue_free(pool->queue[i]);
+    }
+    free(pool->workers);
+    free(pool);
+    return NULL;
+  }
+
   for (size_t i = 0; i < thread_count; i++) {
     struct work_loop_args_s *args = malloc(sizeof(struct work_loop_args_s));
+    if (args == NULL) {
+      for (size_t k = 0; k < i; ++k) {
+        pthread_cancel(pool->worker_tids[k]);
+      }
+      for (int j = 0; j < NUM_OF_TASK_TYPES; ++j) {
+        task_queue_free(pool->queue[j]);
+      }
+      free(pool->worker_tids);
+      free(pool->workers);
+      pthread_mutex_destroy(&pool->mutex);
+      pthread_cond_destroy(&pool->is_finished);
+      pthread_cond_destroy(&pool->is_in_progress);
+      pthread_cond_destroy(&pool->work_available);
+      free(pool);
+      return NULL;
+    }
     args->tpool = pool;
     args->tid = i;
-    // Ensure at least one thread per type
     uint8_t type;
     if (i < 1) {
       type = READER;
@@ -188,17 +216,49 @@ struct tpool_s *tpool_init(size_t thread_count) {
     }
     atomic_store(&pool->workers[i].state, IDLE);
     atomic_store(&pool->workers[i].type, type);
-    pthread_create(&thread, NULL, &thread_work_loop, (void *)args);
+    if (pthread_create(&pool->worker_tids[i], NULL, &thread_work_loop, (void *)args) != 0) {
+      free(args);
+      for (size_t k = 0; k < i; ++k) {
+        pthread_cancel(pool->worker_tids[k]);
+      }
+      for (int j = 0; j < NUM_OF_TASK_TYPES; ++j) {
+        task_queue_free(pool->queue[j]);
+      }
+      free(pool->worker_tids);
+      free(pool->workers);
+      pthread_mutex_destroy(&pool->mutex);
+      pthread_cond_destroy(&pool->is_finished);
+      pthread_cond_destroy(&pool->is_in_progress);
+      pthread_cond_destroy(&pool->work_available);
+      free(pool);
+      return NULL;
+    }
   }
-  pthread_create(&pool->monitor_tid, NULL, &monitor_loop, (void *)pool);
+  if (pthread_create(&pool->monitor_tid, NULL, &monitor_loop, (void *)pool) != 0) {
+    for (size_t i = 0; i < thread_count; ++i) {
+      pthread_cancel(pool->worker_tids[i]);
+    }
+    for (int j = 0; j < NUM_OF_TASK_TYPES; ++j) {
+      task_queue_free(pool->queue[j]);
+    }
+    free(pool->worker_tids);
+    free(pool->workers);
+    pthread_mutex_destroy(&pool->mutex);
+    pthread_cond_destroy(&pool->is_finished);
+    pthread_cond_destroy(&pool->is_in_progress);
+    pthread_cond_destroy(&pool->work_available);
+    free(pool);
+    return NULL;
+  }
   return pool;
 }
 
 void tpool_wait(struct tpool_s *tpool) {
   pthread_mutex_lock(&tpool->mutex);
 
-  while (tpool->active_work_count > 0 || tpool->queue[READER]->count ||
-         tpool->queue[COMPUTER]->count || tpool->queue[WRITER]->count) {
+  while (tpool->active_work_count > 0 || task_queue_count(tpool->queue[READER]) > 0 ||
+         task_queue_count(tpool->queue[COMPUTER]) > 0 || 
+         task_queue_count(tpool->queue[WRITER]) > 0) {
     pthread_cond_wait(&tpool->is_finished, &tpool->mutex);
   }
 
@@ -209,13 +269,22 @@ void tpool_destroy(struct tpool_s *tpool) {
   tpool->stop = true;
   tpool->work_count = 0;
   tpool->active_work_count = 0;
-  pthread_cond_broadcast(&tpool->is_in_progress);
+  pthread_cond_broadcast(&tpool->work_available);
   pthread_mutex_unlock(&tpool->mutex);
-  tpool_wait(tpool);
+
+  for (size_t i = 0; i < tpool->thread_count; ++i) {
+    pthread_join(tpool->worker_tids[i], NULL);
+  }
+  pthread_join(tpool->monitor_tid, NULL);
 
   pthread_mutex_destroy(&tpool->mutex);
   pthread_cond_destroy(&tpool->is_in_progress);
   pthread_cond_destroy(&tpool->is_finished);
+  pthread_cond_destroy(&tpool->work_available);
+  for (int i = 0; i < NUM_OF_TASK_TYPES; ++i) {
+    task_queue_free(tpool->queue[i]);
+  }
+  free(tpool->worker_tids);
   free(tpool->workers);
   free(tpool);
 }
@@ -224,5 +293,7 @@ void task_queue_add_task(struct tpool_s *pool, task_type_t type,
                          task_func_t func, void *args) {
   struct task_s *task = task_init(type, func, args);
   task_queue_push(pool->queue[type], task);
+  pthread_mutex_lock(&pool->mutex);
   pthread_cond_signal(&pool->work_available);
+  pthread_mutex_unlock(&pool->mutex);
 }

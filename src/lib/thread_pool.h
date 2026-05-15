@@ -18,6 +18,7 @@ struct work_s {
 
 struct tpool_s {
   pthread_t monitor_tid;
+  pthread_t *worker_tids;
 
   size_t thread_count;
   size_t work_count;
