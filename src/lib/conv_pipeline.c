@@ -20,54 +20,23 @@ struct computer_args {
   BMP *input_image;
   struct pixel_s *pixels;
   KernelMatrix *kernel;
-  size_t cord;
+  size_t x;
+  size_t y;
+  size_t height;
+  size_t width;
 };
 
-static void task_writer_columns(void *args) {
-  struct computer_args *task_args = (struct computer_args *)args;
-
-  BMP *output_image = task_args->result;
-  const struct pixel_s *pixels = task_args->pixels;
-
-  const size_t xcord = task_args->cord;
-
-  const size_t height = get_height(output_image);
-  const size_t width = get_width(output_image);
-
-  for (size_t ycord = 0; ycord < height; ++ycord) {
-    const struct pixel_s cell = pixels[(ycord * width) + xcord];
-    set_pixel_rgb(output_image, xcord, ycord, cell.r, cell.g, cell.b);
-  }
-  free(task_args);
-}
-static void task_computer_columns(void *args) {
-  const struct computer_args *task_args = (struct computer_args *)args;
-
-  BMP *image = task_args->input_image;
-  struct pixel_s *output_pixels = task_args->pixels;
-  struct tpool_s *pool = task_args->pool;
-
-  const KernelMatrix *kernel = task_args->kernel;
-  const size_t xcord = task_args->cord;
-  const size_t height = get_height(image);
-
-  for (size_t ycord = 0; ycord < height; ++ycord) {
-    convolute_pixel_sequentialy(image, xcord, ycord, kernel, output_pixels);
-  }
-  task_queue_add_task(pool, WRITER, task_writer_columns, args);
-}
-
-static void task_reader_columns(void *args) {
-  struct reader_args *task_args = (struct reader_args *)args;
+static int32_t prepare_image(struct reader_args *task_args, BMP **input_image,
+                             BMP **result_image, struct pixel_s **pixels) {
   const size_t num = task_args->num;
 
-  BMP *input_image = bopen(task_args->args->arr_input[num]);
-  BMP *result_image = b_deep_copy(input_image);
-  task_args->results[num] = result_image;
+  *input_image = bopen(task_args->args->arr_input[num]);
+  *result_image = b_deep_copy(*input_image);
+  task_args->results[num] = *result_image;
 
-  const size_t width = get_width(input_image);
-  const size_t height = get_height(input_image);
-  struct pixel_s *pixels = malloc(height * width * sizeof(struct pixel_s));
+  const size_t width = get_width(*input_image);
+  const size_t height = get_height(*input_image);
+  *pixels = malloc(height * width * sizeof(struct pixel_s));
   if (!pixels) {
     flockfile(stderr);
     fputs("Error in thread: ", stderr);
@@ -75,31 +44,210 @@ static void task_reader_columns(void *args) {
     fputc('\n', stderr);
     funlockfile(stderr);
     free(task_args);
-    return;
+    return false;
   }
+  return true;
+}
 
+static struct computer_args *init_cargs(struct reader_args *task_args,
+                                        BMP *input_image, BMP *result_image,
+                                        struct pixel_s *pixels) {
+  struct computer_args *cargs = malloc(sizeof(struct computer_args));
+  if (!cargs) {
+    flockfile(stderr);
+    fputs("Error in thread: ", stderr);
+    fputs("Can allocate memory", stderr);
+    fputc('\n', stderr);
+    funlockfile(stderr);
+    return NULL;
+  }
+  cargs->pool = task_args->pool;
+  cargs->input_image = input_image;
+  cargs->result = result_image;
+  cargs->pixels = pixels;
+  cargs->kernel = task_args->kernel;
+  return cargs;
+}
+
+static void task_writer_columns(void *args) {
+  struct computer_args *targs = (struct computer_args *)args;
+  const size_t height = get_height(targs->result);
+  const size_t width = get_width(targs->result);
+
+  for (size_t ycord = 0; ycord < height; ++ycord) {
+    const struct pixel_s cell = targs->pixels[(ycord * width) + targs->x];
+    set_pixel_rgb(targs->result, targs->x, ycord, cell.r, cell.g, cell.b);
+  }
+  free(targs);
+}
+
+static void task_computer_columns(void *args) {
+  const struct computer_args *targs = (struct computer_args *)args;
+  const size_t height = get_height(targs->input_image);
+
+  for (size_t ycord = 0; ycord < height; ++ycord) {
+    convolute_pixel_sequentialy(targs->input_image, targs->x, ycord,
+                                targs->kernel, targs->pixels);
+  }
+  task_queue_add_task(targs->pool, WRITER, task_writer_columns, args);
+}
+
+static void task_reader_columns(void *args) {
+  struct reader_args *targs = (struct reader_args *)args;
+  BMP *input_image;
+  BMP *result_image;
+  struct pixel_s *pixels = {NULL};
+  if (!prepare_image(targs, &input_image, &result_image, &pixels)) {
+    return;
+  };
+
+  const size_t width = get_width(input_image);
   for (size_t i = 0; i < width; ++i) {
-    struct computer_args *cargs = malloc(sizeof(struct computer_args));
-    cargs->pool = task_args->pool;
-    cargs->input_image = input_image;
-    cargs->result = result_image;
-    cargs->pixels = pixels;
-    cargs->kernel = task_args->kernel;
-    cargs->cord = i;
-    /* struct tpool_s *pool; */
-    /* BMP *input_image; */
-    /* BMP *output_image; */
-    /* struct pixel_s *pixels; */
-    /* KernelMatrix *kernel; */
-    /* size_t cord */;
-    task_queue_add_task(task_args->pool, COMPUTER, task_computer_columns,
-                        cargs);
+    struct computer_args *cargs =
+        init_cargs(targs, input_image, result_image, pixels);
+    cargs->x = i;
+    task_queue_add_task(targs->pool, COMPUTER, task_computer_columns, cargs);
   }
 }
 
-BMP **apply_filter_pipeline_columns(struct main_args *args,
-                                    KernelMatrix *kernel,
-                                    struct tpool_s *pool) {
+static void task_writer_rows(void *args) {
+  struct computer_args *targs = (struct computer_args *)args;
+  const size_t width = get_width(targs->result);
+
+  for (size_t xcord = 0; xcord < width; ++xcord) {
+    const struct pixel_s cell = targs->pixels[(targs->y * width) + xcord];
+    set_pixel_rgb(targs->result, xcord, targs->y, cell.r, cell.g, cell.b);
+  }
+  free(targs);
+}
+
+static void task_computer_rows(void *args) {
+  const struct computer_args *targs = (struct computer_args *)args;
+  const size_t width = get_width(targs->input_image);
+
+  for (size_t xcord = 0; xcord < width; ++xcord) {
+    convolute_pixel_sequentialy(targs->input_image, xcord, targs->y,
+                                targs->kernel, targs->pixels);
+  }
+  task_queue_add_task(targs->pool, WRITER, task_writer_rows, args);
+}
+
+static void task_reader_rows(void *args) {
+  struct reader_args *targs = (struct reader_args *)args;
+  BMP *input_image;
+  BMP *result_image;
+  struct pixel_s *pixels = {NULL};
+  if (!prepare_image(targs, &input_image, &result_image, &pixels)) {
+    return;
+  };
+
+  const size_t height = get_height(input_image);
+  for (size_t i = 0; i < height; ++i) {
+    struct computer_args *cargs =
+        init_cargs(targs, input_image, result_image, pixels);
+    cargs->y = i;
+    task_queue_add_task(targs->pool, COMPUTER, task_computer_rows, cargs);
+  }
+}
+
+static void task_writer_pixel_by_pixel(void *args) {
+  struct computer_args *targs = (struct computer_args *)args;
+  const size_t width = get_width(targs->result);
+
+  const struct pixel_s cell = targs->pixels[(targs->y * width) + targs->x];
+  set_pixel_rgb(targs->result, targs->x, targs->y, cell.r, cell.g, cell.b);
+
+  free(targs);
+}
+
+static void task_computer_pixel_by_pixel(void *args) {
+  const struct computer_args *targs = (struct computer_args *)args;
+  convolute_pixel_sequentialy(targs->input_image, targs->x, targs->y,
+                              targs->kernel, targs->pixels);
+  task_queue_add_task(targs->pool, WRITER, task_writer_pixel_by_pixel, args);
+}
+
+static void task_reader_pixel_by_pixel(void *args) {
+  struct reader_args *targs = (struct reader_args *)args;
+  BMP *input_image;
+  BMP *result_image;
+  struct pixel_s *pixels = {NULL};
+  if (!prepare_image(targs, &input_image, &result_image, &pixels)) {
+    return;
+  };
+
+  const size_t height = get_height(input_image);
+  const size_t width = get_width(input_image);
+  for (size_t i = 0; i < height; ++i) {
+    for (size_t j = 0; j < width; ++j) {
+      struct computer_args *cargs =
+          init_cargs(targs, input_image, result_image, pixels);
+      cargs->y = i;
+      cargs->x = j;
+      task_queue_add_task(targs->pool, COMPUTER, task_computer_pixel_by_pixel,
+                          cargs);
+    }
+  }
+}
+
+static void task_writer_block(void *args) {
+  struct computer_args *targs = (struct computer_args *)args;
+  const size_t width = get_width(targs->result);
+
+  for (size_t xcord = targs->x; xcord < targs->x + targs->width; ++xcord) {
+    for (size_t ycord = targs->y; ycord < targs->y + targs->height; ++ycord) {
+      const struct pixel_s cell = targs->pixels[(ycord * width) + xcord];
+      set_pixel_rgb(targs->result, xcord, ycord, cell.r, cell.g, cell.b);
+    }
+  }
+  free(targs);
+}
+
+static void task_computer_block(void *args) {
+  const struct computer_args *targs = (struct computer_args *)args;
+  for (size_t xcord = targs->x; xcord < targs->x + targs->width; ++xcord) {
+    for (size_t ycord = targs->y; ycord < targs->y + targs->height; ++ycord) {
+      convolute_pixel_sequentialy(targs->input_image, xcord, ycord,
+                                  targs->kernel, targs->pixels);
+    }
+  }
+  task_queue_add_task(targs->pool, WRITER, task_writer_block, args);
+}
+
+static void task_reader_block(void *args) {
+  struct reader_args *targs = (struct reader_args *)args;
+  BMP *input_image;
+  BMP *result_image;
+  struct pixel_s *pixels = {NULL};
+  if (!prepare_image(targs, &input_image, &result_image, &pixels)) {
+    return;
+  };
+
+  const size_t height = get_height(input_image);
+  const size_t width = get_width(input_image);
+  const size_t num_blocks_x = (width + TILE_SIZE - 1) / TILE_SIZE;
+  const size_t num_blocks_y = (height + TILE_SIZE - 1) / TILE_SIZE;
+  const size_t total_blocks = num_blocks_x * num_blocks_y;
+  for (size_t b = 0; b < total_blocks; ++b) {
+    struct computer_args *cargs =
+        init_cargs(targs, input_image, result_image, pixels);
+    if (!cargs) {
+      return;
+    }
+    const size_t by_idx = b / num_blocks_x;
+    const size_t bx_idx = b % num_blocks_x;
+    cargs->x = bx_idx * TILE_SIZE;
+    cargs->y = by_idx * TILE_SIZE;
+    cargs->width =
+        (cargs->x + TILE_SIZE > width) ? (width - cargs->x) : TILE_SIZE;
+    cargs->height =
+        (cargs->y + TILE_SIZE > height) ? (height - cargs->y) : TILE_SIZE;
+    task_queue_add_task(targs->pool, COMPUTER, task_computer_block, cargs);
+  }
+}
+
+BMP **start_pipeline(struct main_args *args, KernelMatrix *kernel,
+                     struct tpool_s *pool, task_func_t work_func) {
   struct reader_args *task_args =
       malloc(args->num_of_inputs * sizeof(struct reader_args));
   if (task_args == NULL) {
@@ -120,12 +268,35 @@ BMP **apply_filter_pipeline_columns(struct main_args *args,
   }
 
   for (size_t i = 0; i < args->num_of_inputs; i++) {
-    task_queue_add_task(pool, READER, task_reader_columns, &task_args[i]);
+    task_queue_add_task(pool, READER, work_func, &task_args[i]);
   }
   tpool_wait(pool);
   free(task_args);
   return results;
 }
+
+BMP **apply_filter_pipeline_columns(struct main_args *args,
+                                    KernelMatrix *kernel,
+                                    struct tpool_s *pool) {
+  return start_pipeline(args, kernel, pool, task_reader_columns);
+}
+
+BMP **apply_filter_pipeline_rows(struct main_args *args, KernelMatrix *kernel,
+                                 struct tpool_s *pool) {
+  return start_pipeline(args, kernel, pool, task_reader_rows);
+}
+
+BMP **apply_filter_pipeline_pixel_by_pixel(struct main_args *args,
+                                           KernelMatrix *kernel,
+                                           struct tpool_s *pool) {
+  return start_pipeline(args, kernel, pool, task_reader_pixel_by_pixel);
+}
+
+BMP **apply_filter_pipeline_block(struct main_args *args, KernelMatrix *kernel,
+                                  struct tpool_s *pool) {
+  return start_pipeline(args, kernel, pool, task_reader_block);
+}
+
 int32_t apply_filter_pipeline(struct main_args *args) {
   size_t thread_count = thread_process_count();
   struct tpool_s *pool = tpool_init(thread_count);
@@ -146,13 +317,13 @@ int32_t apply_filter_pipeline(struct main_args *args) {
     results = apply_filter_pipeline_columns(args, kernel, pool);
     break;
   case ROWS:
-    fputs("UNIMPL\n", stderr);
+    results = apply_filter_pipeline_rows(args, kernel, pool);
     break;
   case PIXEL_BY_PIXEL:
-    fputs("UNIMPL\n", stderr);
+    results = apply_filter_pipeline_pixel_by_pixel(args, kernel, pool);
     break;
   case BLOCK:
-    fputs("UNIMPL\n", stderr);
+    results = apply_filter_pipeline_block(args, kernel, pool);
     break;
   }
 

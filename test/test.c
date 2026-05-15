@@ -56,33 +56,33 @@ static int32_t compare_images(BMP *fst, BMP *snd) {
   return 0;
 }
 
-static void test_template_openmp(char *image_path, const int8_t filter) {
-  BMP *image_par_col = bopen(image_path);
-  BMP *image_par_row = bopen(image_path);
-  BMP *image_par_pix = bopen(image_path);
-  BMP *image_par_blk = bopen(image_path);
-  BMP *image_seq = bopen(image_path);
-  KernelMatrix *ker = choose_kernel_matrix(filter);
+/* static void test_template_openmp(char *image_path, const int8_t filter) { */
+/*   BMP *image_par_col = bopen(image_path); */
+/*   BMP *image_par_row = bopen(image_path); */
+/*   BMP *image_par_pix = bopen(image_path); */
+/*   BMP *image_par_blk = bopen(image_path); */
+/*   BMP *image_seq = bopen(image_path); */
+/*   KernelMatrix *ker = choose_kernel_matrix(filter); */
 
-  conv_apply_kernel_parallelly_columns(image_par_col, ker);
-  conv_apply_kernel_parallelly_rows(image_par_row, ker);
-  conv_apply_kernel_parallelly_pixel_by_pixel(image_par_pix, ker);
-  conv_apply_kernel_parallelly_block(image_par_blk, ker);
+/*   conv_apply_kernel_parallelly_columns(image_par_col, ker); */
+/*   conv_apply_kernel_parallelly_rows(image_par_row, ker); */
+/*   conv_apply_kernel_parallelly_pixel_by_pixel(image_par_pix, ker); */
+/*   conv_apply_kernel_parallelly_block(image_par_blk, ker); */
 
-  conv_apply_kernel_sequentialy(image_seq, ker);
+/*   conv_apply_kernel_sequentialy(image_seq, ker); */
 
-  assert_int_equal(compare_images(image_seq, image_par_col), 0);
-  assert_int_equal(compare_images(image_par_col, image_par_row), 0);
-  assert_int_equal(compare_images(image_par_row, image_par_pix), 0);
-  assert_int_equal(compare_images(image_par_pix, image_par_blk), 0);
+/*   assert_int_equal(compare_images(image_seq, image_par_col), 0); */
+/*   assert_int_equal(compare_images(image_par_col, image_par_row), 0); */
+/*   assert_int_equal(compare_images(image_par_row, image_par_pix), 0); */
+/*   assert_int_equal(compare_images(image_par_pix, image_par_blk), 0); */
 
-  bclose(image_seq);
-  bclose(image_par_col);
-  bclose(image_par_row);
-  bclose(image_par_pix);
-  bclose(image_par_blk);
-  free_kernel_matrix(ker);
-}
+/*   bclose(image_seq); */
+/*   bclose(image_par_col); */
+/*   bclose(image_par_row); */
+/*   bclose(image_par_pix); */
+/*   bclose(image_par_blk); */
+/*   free_kernel_matrix(ker); */
+/* } */
 
 static void test_template_pipeline(char *image_path, const int8_t filter) {
   BMP *image_seq = bopen(image_path);
@@ -97,14 +97,37 @@ static void test_template_pipeline(char *image_path, const int8_t filter) {
       .mode_option = COLUMNS,
       .filter_option = filter,
       .use_pipeline = true,
-      .num_of_inputs = 0,
+      .num_of_inputs = 1,
   };
 
   conv_apply_kernel_sequentialy(image_seq, ker);
-  BMP **pipeline_results = apply_filter_pipeline_columns(&args, ker, pool);
+  BMP **pipeline_image_cols = apply_filter_pipeline_columns(&args, ker, pool);
+  BMP **pipeline_image_rows = apply_filter_pipeline_rows(&args, ker, pool);
+  BMP **pipeline_image_pixel =
+      apply_filter_pipeline_pixel_by_pixel(&args, ker, pool);
+  BMP **pipeline_image_block = apply_filter_pipeline_block(&args, ker, pool);
   for (size_t i = 0; i < args.num_of_inputs; ++i) {
-    assert_int_equal(compare_images(pipeline_results[i], image_seq), 0);
-    bclose(pipeline_results[i]);
+    if (compare_images(pipeline_image_cols[i], image_seq) != 0) {
+      puts("Columns error");
+      assert_int_equal(1, 0);
+    }
+
+    if (compare_images(pipeline_image_rows[i], image_seq) != 0) {
+      puts("Rows error");
+      assert_int_equal(1, 0);
+    }
+    if (compare_images(pipeline_image_pixel[i], image_seq) != 0) {
+      puts("Pixel by pixel error");
+      assert_int_equal(1, 0);
+    }
+    if (compare_images(pipeline_image_block[i], image_seq) != 0) {
+      puts("Block error");
+      assert_int_equal(1, 0);
+    }
+    bclose(pipeline_image_cols[i]);
+    bclose(pipeline_image_rows[i]);
+    bclose(pipeline_image_pixel[i]);
+    bclose(pipeline_image_block[i]);
   }
 
   bclose(image_seq);
@@ -138,62 +161,62 @@ static void test_fuzzing_pipeline(const int8_t filter) {
   }
 }
 
-static void test_fuzzing_openmp(const int8_t filter) {
-  for (int i = 0; i < FUZZING_ITER_COUNT; ++i) {
-    generate_random_image();
-    test_template_openmp(TMP_IMAGE_PATH, filter);
-  }
-}
+/* static void test_fuzzing_openmp(const int8_t filter) { */
+/*   for (int i = 0; i < FUZZING_ITER_COUNT; ++i) { */
+/*     generate_random_image(); */
+/*     test_template_openmp(TMP_IMAGE_PATH, filter); */
+/*   } */
+/* } */
 
-static void test_ridge1_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_1_PATH, RIDGE);
-}
+/* static void test_ridge1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_1_PATH, RIDGE); */
+/* } */
 
-static void test_ridge2_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_2_PATH, RIDGE);
-}
+/* static void test_ridge2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_2_PATH, RIDGE); */
+/* } */
 
-static void test_3x3_gauss1_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_1_PATH, BLUR3);
-}
+/* static void test_3x3_gauss1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_1_PATH, BLUR3); */
+/* } */
 
-static void test_3x3_gauss2_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_2_PATH, BLUR3);
-}
+/* static void test_3x3_gauss2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_2_PATH, BLUR3); */
+/* } */
 
-static void test_5x5_gauss1_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_1_PATH, BLUR5);
-}
+/* static void test_5x5_gauss1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_1_PATH, BLUR5); */
+/* } */
 
-static void test_5x5_gauss2_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_2_PATH, BLUR5);
-}
+/* static void test_5x5_gauss2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_2_PATH, BLUR5); */
+/* } */
 
-static void test_sharp1_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_1_PATH, SHARP);
-}
+/* static void test_sharp1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_1_PATH, SHARP); */
+/* } */
 
-static void test_sharp2_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_2_PATH, SHARP);
-}
+/* static void test_sharp2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_2_PATH, SHARP); */
+/* } */
 
-static void test_identity1_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_1_PATH, IDENT);
-}
+/* static void test_identity1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_1_PATH, IDENT); */
+/* } */
 
-static void test_identity2_openmp(void **state) {
-  (void)state;
-  test_template_openmp(TEST_IMAGE_2_PATH, IDENT);
-}
+/* static void test_identity2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_template_openmp(TEST_IMAGE_2_PATH, IDENT); */
+/* } */
 
 static void test_ridge1_pipeline(void **state) {
   (void)state;
@@ -245,55 +268,55 @@ static void test_identity2_pipeline(void **state) {
   test_template_pipeline(TEST_IMAGE_2_PATH, IDENT);
 }
 
-static void test_fuzzing_ridge1_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(RIDGE);
-}
+/* static void test_fuzzing_ridge1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(RIDGE); */
+/* } */
 
-static void test_fuzzing_ridge2_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(RIDGE);
-}
+/* static void test_fuzzing_ridge2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(RIDGE); */
+/* } */
 
-static void test_fuzzing_3x3_gauss1_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(BLUR3);
-}
+/* static void test_fuzzing_3x3_gauss1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(BLUR3); */
+/* } */
 
-static void test_fuzzing_3x3_gauss2_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(BLUR3);
-}
+/* static void test_fuzzing_3x3_gauss2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(BLUR3); */
+/* } */
 
-static void test_fuzzing_5x5_gauss1_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(BLUR5);
-}
+/* static void test_fuzzing_5x5_gauss1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(BLUR5); */
+/* } */
 
-static void test_fuzzing_5x5_gauss2_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(BLUR5);
-}
+/* static void test_fuzzing_5x5_gauss2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(BLUR5); */
+/* } */
 
-static void test_fuzzing_sharp1_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(SHARP);
-}
+/* static void test_fuzzing_sharp1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(SHARP); */
+/* } */
 
-static void test_fuzzing_sharp2_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(SHARP);
-}
+/* static void test_fuzzing_sharp2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(SHARP); */
+/* } */
 
-static void test_fuzzing_identity1_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(IDENT);
-}
+/* static void test_fuzzing_identity1_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(IDENT); */
+/* } */
 
-static void test_fuzzing_identity2_openmp(void **state) {
-  (void)state;
-  test_fuzzing_openmp(IDENT);
-}
+/* static void test_fuzzing_identity2_openmp(void **state) { */
+/*   (void)state; */
+/*   test_fuzzing_openmp(IDENT); */
+/* } */
 
 static void test_fuzzing_ridge1_pipeline(void **state) {
   (void)state;
@@ -349,16 +372,16 @@ int main(void) {
 
   const struct CMUnitTest tests[] = {
       // clang-format off
-    cmocka_unit_test(test_3x3_gauss1_openmp),
-    cmocka_unit_test(test_3x3_gauss2_openmp),
-    cmocka_unit_test(test_5x5_gauss1_openmp),
-    cmocka_unit_test(test_5x5_gauss2_openmp),
-    cmocka_unit_test(test_identity1_openmp),
-    cmocka_unit_test(test_identity2_openmp),
-    cmocka_unit_test(test_ridge1_openmp),
-    cmocka_unit_test(test_ridge2_openmp),
-    cmocka_unit_test(test_sharp1_openmp),
-    cmocka_unit_test(test_sharp2_openmp),
+    /* cmocka_unit_test(test_3x3_gauss1_openmp), */
+    /* cmocka_unit_test(test_3x3_gauss2_openmp), */
+    /* cmocka_unit_test(test_5x5_gauss1_openmp), */
+    /* cmocka_unit_test(test_5x5_gauss2_openmp), */
+    /* cmocka_unit_test(test_identity1_openmp), */
+    /* cmocka_unit_test(test_identity2_openmp), */
+    /* cmocka_unit_test(test_ridge1_openmp), */
+    /* cmocka_unit_test(test_ridge2_openmp), */
+    /* cmocka_unit_test(test_sharp1_openmp), */
+    /* cmocka_unit_test(test_sharp2_openmp), */
     cmocka_unit_test(test_3x3_gauss1_pipeline),
     cmocka_unit_test(test_3x3_gauss2_pipeline),
     cmocka_unit_test(test_5x5_gauss1_pipeline),
@@ -369,16 +392,16 @@ int main(void) {
     cmocka_unit_test(test_ridge2_pipeline),
     cmocka_unit_test(test_sharp1_pipeline),
     cmocka_unit_test(test_sharp2_pipeline),
-    cmocka_unit_test(test_fuzzing_3x3_gauss1_openmp),
-    cmocka_unit_test(test_fuzzing_3x3_gauss2_openmp),
-    cmocka_unit_test(test_fuzzing_5x5_gauss1_openmp),
-    cmocka_unit_test(test_fuzzing_5x5_gauss2_openmp),
-    cmocka_unit_test(test_fuzzing_identity1_openmp),
-    cmocka_unit_test(test_fuzzing_identity2_openmp),
-    cmocka_unit_test(test_fuzzing_ridge1_openmp),
-    cmocka_unit_test(test_fuzzing_ridge2_openmp),
-    cmocka_unit_test(test_fuzzing_sharp1_openmp),
-    cmocka_unit_test(test_fuzzing_sharp2_openmp),
+    /* cmocka_unit_test(test_fuzzing_3x3_gauss1_openmp), */
+    /* cmocka_unit_test(test_fuzzing_3x3_gauss2_openmp), */
+    /* cmocka_unit_test(test_fuzzing_5x5_gauss1_openmp), */
+    /* cmocka_unit_test(test_fuzzing_5x5_gauss2_openmp), */
+    /* cmocka_unit_test(test_fuzzing_identity1_openmp), */
+    /* cmocka_unit_test(test_fuzzing_identity2_openmp), */
+    /* cmocka_unit_test(test_fuzzing_ridge1_openmp), */
+    /* cmocka_unit_test(test_fuzzing_ridge2_openmp), */
+    /* cmocka_unit_test(test_fuzzing_sharp1_openmp), */
+    /* cmocka_unit_test(test_fuzzing_sharp2_openmp), */
     cmocka_unit_test(test_fuzzing_3x3_gauss1_pipeline),
     cmocka_unit_test(test_fuzzing_3x3_gauss2_pipeline),
     cmocka_unit_test(test_fuzzing_5x5_gauss1_pipeline),

@@ -8,11 +8,14 @@
 
 #define LAYER_COUNT 3
 
-#ifdef __GCC_DESTRUCTIVE_SIZE
-#define CACHE_LINE_SIZE __GCC_DESTRUCTIVE_SIZE / 8
-#else
-#define CACHE_LINE_SIZE 8
-#endif
+/* #ifdef __GCC_DESTRUCTIVE_SIZE */
+/* #define CACHE_LINE_SIZE __GCC_DESTRUCTIVE_SIZE / 8 */
+/* #else */
+/* #define CACHE_LINE_SIZE 8 */
+/* #endif */
+
+#define CHANNELS_COUNT 3
+#define TILE_SIZE 16
 
 struct pixel_s {
   uint8_t r;

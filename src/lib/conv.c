@@ -14,9 +14,6 @@
 #include <time.h>
 #endif
 
-#define CHANNELS_COUNT 3
-#define TILE_SIZE 16
-
 int64_t multiply_by_rational_and_ceil(long num, long numer, long denom) {
   const long product = num * numer;
   const long remainder = product % denom;
