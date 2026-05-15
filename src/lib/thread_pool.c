@@ -74,7 +74,7 @@ void *monitor_loop(void *tpool_ptr) {
   struct tpool_s *pool = tpool_ptr;
 
   while (!pool->stop) {
-    sleep(SLEEP_TIME_MONITOR_LOOP);
+    /* sleep(SLEEP_TIME_MONITOR_LOOP); */
 
     size_t read_q = pool->queue[READER]->count;
     size_t compute_q = pool->queue[COMPUTER]->count;

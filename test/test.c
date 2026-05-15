@@ -18,7 +18,7 @@
 
 #define TEST_IMAGE_1_PATH "test/images/emacs.bmp"
 #define TEST_IMAGE_2_PATH "test/images/coolgame.bmp"
-#define TMP_IMAGE_PATH "/tmp/tmpimage.bmp"
+#define TMP_IMAGE_PATH "tmpimage.bmp"
 
 #define FUZZING_ITER_COUNT 1
 
@@ -150,14 +150,14 @@ void generate_random_image(void) {
 static void test_fuzzing_pipeline(const int8_t filter) {
   for (int i = 0; i < FUZZING_ITER_COUNT; ++i) {
     generate_random_image();
-    test_template_pipeline(TMP_IMAGE_PATH, filter);
+    test_template_pipeline(TEST_IMAGE_1_PATH, filter);
   }
 }
 
 static void test_fuzzing_openmp(const int8_t filter) {
   for (int i = 0; i < FUZZING_ITER_COUNT; ++i) {
     generate_random_image();
-    test_template_openmp(TMP_IMAGE_PATH, filter);
+    test_template_openmp(TEST_IMAGE_1_PATH, filter);
   }
 }
 
