@@ -74,7 +74,7 @@ void *monitor_loop(void *tpool_ptr) {
   struct tpool_s *pool = tpool_ptr;
 
   while (!pool->stop) {
-    /* sleep(SLEEP_TIME_MONITOR_LOOP); */
+    sleep(SLEEP_TIME_MONITOR_LOOP);
 
     size_t read_q = pool->queue[READER]->count;
     size_t compute_q = pool->queue[COMPUTER]->count;
@@ -82,7 +82,7 @@ void *monitor_loop(void *tpool_ptr) {
 
     int32_t readers = 0;
     int32_t computers = 0;
-    /* int32_t writers = 0; */
+    int32_t writers = 0;
     for (size_t i = 0; i < pool->thread_count; ++i) {
       switch (atomic_load(&pool->workers[i].type)) {
       case READER:
@@ -91,15 +91,15 @@ void *monitor_loop(void *tpool_ptr) {
       case COMPUTER:
         computers++;
         break;
-      /* case WRITER: */
-      /*   writers++; */
-      /*   break; */
+      case WRITER:
+        writers++;
+        break;
       default:
         break;
       }
     }
 
-    // Rebalancing decisions
+    // Rebalancing decisions - never move the last thread of any type
     if (compute_q > 10 && readers > 1) {
       move_thread_to_role(pool, READER, COMPUTER);
     }
@@ -112,7 +112,26 @@ void *monitor_loop(void *tpool_ptr) {
       move_thread_to_role(pool, READER, COMPUTER);
     }
 
+    // Rebalance back if a stage gets stuck with no threads
+    if (readers == 0 && computers > 1) {
+      move_thread_to_role(pool, COMPUTER, READER);
+    }
+
+    if (computers == 0 && (readers > 1 || writers > 1)) {
+      if (writers > 1) {
+        move_thread_to_role(pool, WRITER, COMPUTER);
+      } else if (readers > 1) {
+        move_thread_to_role(pool, READER, COMPUTER);
+      }
+    }
+
+    if (writers == 0 && computers > 1) {
+      move_thread_to_role(pool, COMPUTER, WRITER);
+    }
+
+    pthread_mutex_lock(&pool->mutex);
     pthread_cond_broadcast(&pool->work_available);
+    pthread_mutex_unlock(&pool->mutex);
   }
   return NULL;
 }
@@ -158,7 +177,15 @@ struct tpool_s *tpool_init(size_t thread_count) {
     struct work_loop_args_s *args = malloc(sizeof(struct work_loop_args_s));
     args->tpool = pool;
     args->tid = i;
-    uint8_t type = i < 2 ? READER : (i < thread_count - 2 ? COMPUTER : WRITER);
+    // Ensure at least one thread per type
+    uint8_t type;
+    if (i < 1) {
+      type = READER;
+    } else if (i < thread_count - 1) {
+      type = COMPUTER;
+    } else {
+      type = WRITER;
+    }
     atomic_store(&pool->workers[i].state, IDLE);
     atomic_store(&pool->workers[i].type, type);
     pthread_create(&thread, NULL, &thread_work_loop, (void *)args);
