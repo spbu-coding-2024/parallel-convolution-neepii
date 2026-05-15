@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     return EXITFAILURE;
   }
 
-  if (args.use_pipeline) {
+  if (args.use_pipeline && args.mode_option != SEQUENTIALLY) {
     if (!apply_filter_pipeline(&args)) {
       fputs("Cannot apply filter\n", stderr);
       free_main_args(&args);

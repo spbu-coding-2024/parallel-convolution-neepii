@@ -91,20 +91,23 @@ static void test_template_pipeline(char *image_path, const int8_t filter) {
   struct tpool_s *pool = tpool_init(thread_count);
   char *image_arr = {image_path};
 
+  conv_apply_kernel_sequentialy(image_seq, ker);
+
   struct main_args args = {
       .arr_input = &image_arr,
-      .mode_option = COLUMNS,
       .filter_option = filter,
       .use_pipeline = true,
       .num_of_inputs = 1,
   };
+  args.mode_option = COLUMNS;
+  BMP **pipeline_image_cols = start_pipeline_and_wait(&args, ker, pool);
+  args.mode_option = ROWS;
+  BMP **pipeline_image_rows = start_pipeline_and_wait(&args, ker, pool);
+  args.mode_option = PIXEL_BY_PIXEL;
+  BMP **pipeline_image_pixel = start_pipeline_and_wait(&args, ker, pool);
+  args.mode_option = BLOCK;
+  BMP **pipeline_image_block = start_pipeline_and_wait(&args, ker, pool);
 
-  conv_apply_kernel_sequentialy(image_seq, ker);
-  BMP **pipeline_image_cols = apply_filter_pipeline_columns(&args, ker, pool);
-  BMP **pipeline_image_rows = apply_filter_pipeline_rows(&args, ker, pool);
-  BMP **pipeline_image_pixel =
-      apply_filter_pipeline_pixel_by_pixel(&args, ker, pool);
-  BMP **pipeline_image_block = apply_filter_pipeline_block(&args, ker, pool);
   for (size_t i = 0; i < args.num_of_inputs; ++i) {
     assert_int_equal(compare_images(pipeline_image_cols[i], image_seq), 0);
 
