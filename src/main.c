@@ -6,11 +6,11 @@
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 int main(int argc, char *argv[]) {
   struct main_args args = {
-      .output_name = NULL, // TODO: REMOVE
       .arr_input = NULL,
       .mode_option = COLUMNS,
       .filter_option = IDENT,
@@ -37,10 +37,13 @@ int main(int argc, char *argv[]) {
       }
       if (!apply_filter(image, args)) {
         fputs("Cannot apply filter\n", stderr);
+        bclose(image);
         free_main_args(&args);
         return EXITFAILURE;
       }
-      bwrite(image, args.output_name);
+      const size_t output_len = strlen(args.arr_input[i]);
+      char buffer[output_len + 2];
+      bwrite(image, buffer);
       bclose(image);
     }
   }

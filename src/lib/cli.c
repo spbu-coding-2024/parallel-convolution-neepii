@@ -15,7 +15,6 @@ static void usage(void) {
   puts("Usage: %s [OPTION...] -o OUTPUT [INPUT FILES...]\n"
        "Apply image filters to BMP files.\n"
        "\n"
-       "  -o FILE     output image file\n"
        "  -f FILTER   apply filter (see below)\n"
        "  -m MODE     use compute mode (see below)\n"
        "  -r          don't use pipeline\n"
@@ -35,13 +34,13 @@ static void usage(void) {
        "  pixel       compute parallely pixel by pixel\n"
        "\n"
        "EXAMPLE:\n"
-       "  %s -o blurred.bmp -f blur3 photo.bmp");
+       "  %s -o blurred.bmp -f blur3 photo.bmp"
+       "Which will output photo.bmpo");
 }
 void free_main_args(struct main_args *margs) {
   if (margs == NULL) {
     return;
   }
-  free(margs->output_name);
   for (size_t i = 0; i < margs->num_of_inputs; ++i) {
     free(margs->arr_input[i]);
   }
@@ -88,7 +87,7 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
   int opt;
   int8_t return_code = ERROR_OPTION;
 
-  margs->arr_input = malloc(sizeof(char *) * argc);
+  margs->arr_input = calloc(argc, sizeof(char *));
   if (!margs->arr_input) {
     return false;
   }
@@ -100,13 +99,6 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
       goto args_free;
     case 'r':
       margs->use_pipeline = false;
-      break;
-    case 'o':
-      margs->output_name = strdup(optarg);
-      if (!margs->output_name) {
-        fputs("Can't allocate memory for output name\n", stderr);
-        goto args_free;
-      }
       break;
     case 'm':
       return_code = get_enum_from_option(
@@ -137,7 +129,7 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
     }
     margs->num_of_inputs++;
   }
-  if (margs->num_of_inputs == 0 || !margs->output_name) {
+  if (margs->num_of_inputs == 0) {
     usage();
     goto args_free;
   }
@@ -145,7 +137,6 @@ bool get_args(int argc, char *argv[], struct main_args *margs) {
   return true;
 
 args_free:
-  free(margs->output_name);
   for (size_t i = 0; i < margs->num_of_inputs; ++i) {
     free(margs->arr_input[i]);
   }

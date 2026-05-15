@@ -253,7 +253,7 @@ BMP **start_pipeline(struct main_args *args, KernelMatrix *kernel,
   if (task_args == NULL) {
     return NULL;
   }
-  BMP **results = malloc(sizeof(args->num_of_inputs * sizeof(BMP *)));
+  BMP **results = calloc(args->num_of_inputs, sizeof(BMP *));
   if (!results) {
     free(task_args);
     return NULL;
@@ -332,7 +332,7 @@ int32_t apply_filter_pipeline(struct main_args *args) {
       const size_t output_len = strlen(args->arr_input[i]);
       char buffer[output_len + 2];
       from_input_to_output(args->arr_input[i], output_len, buffer);
-      bwrite(results[i], buffer);
+      bwrite(results[i], buffer); // NOLINT
       bclose(results[i]);
     }
     free(results);

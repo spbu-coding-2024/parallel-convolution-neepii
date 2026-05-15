@@ -11,7 +11,6 @@ enum exit_status {
 };
 
 struct main_args {
-  char *output_name;
   char **arr_input;
   size_t num_of_inputs;
   uint8_t mode_option;
